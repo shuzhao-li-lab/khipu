@@ -1,7 +1,6 @@
+import json
 import networkx as nx
-
 from mass2chem.search import build_centurion_tree, find_all_matches_centurion_indexed_list
-
 
 def make_peak_tag(peak):
     '''
@@ -12,7 +11,7 @@ def make_peak_tag(peak):
 
 def make_edge_tag(edge):
     '''
-    Concatenate str edges by underscore
+    Concatenate sorted str edges by underscore
     '''
     if edge[0] > edge[1]:
         return edge[1] + '_' + edge[0]
@@ -21,11 +20,19 @@ def make_edge_tag(edge):
 
 def make_peak_dict(peak_list):
     '''
-    Same as search.build_peak_id_dict but uses 'id' not 'id_number'.
+    Same as search.build_peak_id_dict but uses either 'id' or 'id_number'.
     '''
+    if 'id' in peak_list[0]:
+        k = 'id'
+    elif 'id_number' in peak_list[0]:
+        k = 'id_number'
+    else:
+        raise KeyError("Peaks need 'id' or 'id_number' as key.")
+        
     peak_dict = {}
     for p in peak_list:
-        peak_dict[p['id']] = p
+        p['id'] = p[k]
+        peak_dict[p[k]] = p
     return peak_dict
 
 def rt_matched_by_tolerance(P1, P2, rt_tolerance):
@@ -33,6 +40,41 @@ def rt_matched_by_tolerance(P1, P2, rt_tolerance):
 
 def rt_compared_by_values(P1, P2, rt_tolerance=None):
     return P2['rtime'] > P1['rtime']
+
+def assign_masstrack_ids_in_khipu(feature_dict, mz_tolerance_ppm=5):
+    '''Assign mass track ids if they are not included in peak dict.
+    They should be if features were processed by asari.
+
+    Parameters
+    ----------
+    feature_dict : feature dictionary indexed by feature ids, based on input network to khipu, 
+        thus very limited size.
+    mz_tolerance_ppm : ppm tolerance in examining m/z groups.
+
+    Returns
+    -------
+    Updated feature_dict with 'parent_masstrack_id'.
+
+    Notes
+    -----
+    Sort by m/z; separate by mz_tolerance_ppm.
+    m/z has to be check by ppm because 1) minor variation may exist btw peaks; and 
+    2) float numbers are bad for dictionary keys.
+    This method may accidently merge m/z regions in rare situations in extremely bad data.
+    '''
+    features = sorted([(feature_dict[n]['mz'], n) for n in feature_dict])
+    _N = len(features)
+    current_mz = features[0][0]
+    str_mz = str(current_mz)
+    feature_dict[features[0][1]]['parent_masstrack_id'] = str_mz
+    for x in features[1:]:
+        if x[0]-current_mz > current_mz * mz_tolerance_ppm * 0.000001:
+            current_mz = x[0]
+            str_mz = str(current_mz)
+        feature_dict[x[1]]['parent_masstrack_id'] = str_mz
+
+    return feature_dict
+
 
 def get_isotopic_edge_pairs(list_peaks, 
                     mztree, 
@@ -51,12 +93,12 @@ def get_isotopic_edge_pairs(list_peaks,
     list_peaks: [{'parent_masstrace_id': 1670, 'mz': 133.09702315984987, 'rtime': 654, 'height': 14388.0, 'id': 555}, ...]
     mztree: indexed list_peaks
     mz_tolerance_ppm: ppm tolerance in examining m/z patterns.
-    seed_search_patterns: a list in the format of [(mz difference, notion, (ratio low limit, ratio high limit)), ..]
+    search_patterns: a list in the format of [(mz difference, notion, (ratio low limit, ratio high limit)), ..]
             This can be obtained through search.isotopic_patterns. The ratios are optional, because 
             1) naturally occuring constrains are based on chemical formula;
             2) rules are different when isotope tracers are introduced to the experiments.
             But it's important to have a comprehensive list here for isotope tracing experiments.
-    isotope_rt_tolerance: tolerance threshold for deviation in retetion time, arbitrary unit depending on input data.
+    rt_tolerance: tolerance threshold for deviation in retetion time, arbitrary unit depending on input data.
             Default intended as 2 seconds.
 
     Return
@@ -94,12 +136,8 @@ def get_adduct_edge_pairs(list_peaks,
     list_peaks: [{'parent_masstrace_id': 1670, 'mz': 133.09702315984987, 'rtime': 654, 'height': 14388.0, 'id': 555}, ...]
     mztree: indexed list_peaks
     mz_tolerance_ppm: ppm tolerance in examining m/z patterns.
-    seed_search_patterns: a list in the format of [(mz difference, notion, (ratio low limit, ratio high limit)), ..]
-            This can be obtained through search.isotopic_patterns. The ratios are optional, because 
-            1) naturally occuring constrains are based on chemical formula;
-            2) rules are different when isotope tracers are introduced to the experiments.
-            But it's important to have a comprehensive list here for isotope tracing experiments.
-    isotope_rt_tolerance: tolerance threshold for deviation in retetion time, arbitrary unit depending on input data.
+    search_patterns: a list in the format of [(mz difference, notion), ...] 
+    rt_tolerance: tolerance threshold for deviation in retetion time, arbitrary unit depending on input data.
             Default intended as 2 seconds.
 
     Return
@@ -134,8 +172,49 @@ def peaks_to_networks(peak_list,
                     mz_tolerance_ppm=5, 
                     rt_tolerance=2, 
                     ):
-    '''
+    '''Search peak_list for patterns of isotopes and adducts, form a network and get connected subnetworks.
+    
+    Parameters
+    ----------
+    list_peaks : [{'mz': 133.09702315984987, 'rtime': 654, 'id': 555}, ...]
 
+    isotope_search_patterns : exact list used to retrieve the subnetworks. E.g. 
+        [ (1.003355, '13C/12C', (0, 0.8)),
+        (2.00671, '13C/12C*2', (0, 0.8)),
+        (3.010065, '13C/12C*3', (0, 0.8)),
+        (4.01342, '13C/12C*4', (0, 0.8)),
+        (5.016775, '13C/12C*5', (0, 0.8)),
+        (6.02013, '13C/12C*6', (0, 0.8)),]
+
+    adduct_search_patterns : exact list used to retrieve the subnetworks. 
+        It's not recommended to have a long list here, as it's better to search additional 
+        in-source modifications after empCpds are seeded. Example adduct_search_patterns list: 
+        [ (1.0078, 'H'), 
+        (21.9820, 'Na/H'), 
+        (41.026549, 'Acetonitrile')]
+
+    mz_tolerance_ppm : ppm tolerance in examining m/z patterns.
+    rt_tolerance: tolerance threshold for deviation in retetion time, arbitrary unit depending on input data.
+            Default intended as 2 seconds.
+
+    Returns
+    -------
+    subnetwork : undirected graph. Example edges:
+        [('F1606', 'F20', {'type': 'modification', 'tag': 'H'}), 
+        ('F3533', 'F20', {'type': 'modification', 'tag': 'Na/H'}), 
+        ('F195', 'F20', {'type': 'modification', 'tag': 'Acetonitrile'}), 
+        ('F20', 'F807', {'type': 'modification', 'tag': 'Acetonitrile'}), 
+        ('F20', 'F53', {'type': 'isotope', 'tag': '13C/12C'}), 
+        ('F874', 'F808', {'type': 'isotope', 'tag': '13C/12C'})]
+
+    peak_dict, edge_dict
+
+    Notes
+    -----
+    Features of low abundance may not have detectable isotopes, but can have multiple adducts.
+    Do not include too many adducts in the intial search. 
+    Do not include neutral loss and fragments in initial search.
+    They are better done after a list of khipus are constructed.
     '''
     mztree = build_centurion_tree(peak_list)
     peak_dict = make_peak_dict(peak_list)
@@ -157,8 +236,11 @@ def peaks_to_networks(peak_list,
         edge_dict[make_edge_tag(e)] = {"source": e[0], "target": e[1], "type": "modification", "tag": e[2]}
 
     edges = []
-    for e in iso_edges + adduct_edges:
-        edges.append(e[:2])
+    for e in iso_edges:
+       edges.append( (e[0], e[1], {"type": "isotope", "tag": e[2]}) )
+    for e in adduct_edges:
+        edges.append( (e[0], e[1], {"type": "modification", "tag": e[2]}) )
+
     G = nx.Graph()
     G.add_edges_from( edges )
     subnetworks = [G.subgraph(c).copy() for c in nx.connected_components(G)]
@@ -166,10 +248,33 @@ def peaks_to_networks(peak_list,
     return subnetworks, peak_dict, edge_dict
 
 
+def realign_isotopes(sorted_mz_peak_ids, isotope_search_patterns):
+    '''To snap isotopic branch. Assume lowest m/z as M0, and re-align other features against M0.
+        Because edges in g can be relationship between any pairs. 
+        Re-alignment will get them consistent on grid.
+        No redundant features are allowed here, whihc are handled in khipu.clean().
 
+    Parameters
+    ----------
+    sorted_mz_peak_ids : [(mz, peak_id), ...]
+    isotope_search_patterns : [ (1.003355, '13C/12C', (0, 0.8)), (3.010065, '13C/12C*3', (0, 0.8)),..]
 
+    Returns
+    -------
+    A dictionary of {'M0': F1, '13C/12C*2': F11, ...}
+    '''
+    M0 = sorted_mz_peak_ids[0]
+    _d = {'M0': M0[1]}
+    for p in sorted_mz_peak_ids[1:]:
+        _d[p[1]] = get_isotope_pattern_name(p[0] - M0[0], isotope_search_patterns)
+    return _d
 
-
+def get_isotope_pattern_name(mz, isotope_search_patterns):
+    '''Get the isotope with closest m/z match. Not checking error ppm as mz is expected from previous matches.
+    Used by realign_isotopes.
+    '''
+    L = sorted([(abs(mz-x[0]), x[1]) for x in isotope_search_patterns])
+    return L[0][1]
 
 
 def add_data_to_tag(trees, len_limit=20):
@@ -223,5 +328,18 @@ def find_trees_by_datatag_list(trees, datatag_list=["13C/12C",
     return [find_trees_by_datatag(trees, datatag) for datatag in datatag_list]
 
 
-
+def __mass_pair_mapping(list1, list2):
+    '''Placeholder. Find best matched value_index in list2 for each value in list1.
+    Parameters
+    ----------
+    list1, list2 : each a list of m/z values
+    Returns
+    -------
+    list1_matched : list of index position of best match in list2 for each value in list1
+    Notes
+    -----
+    ref: asari.mass_functions.complete_mass_paired_mapping
+    Given the small size of matrices in khipu, np.argmin() is a better solution.
+    '''
+    pass
 
