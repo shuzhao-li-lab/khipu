@@ -11,41 +11,29 @@ Read 4016 feature lines
 4016 {'id': 'F6', 'mz': 117.0659, 'rtime': 148.54, 'intensities': [5630973.0, 321067.0, 237998.0, 97759.0], 'representative_intensity': 1571949.25}
 >>> 
 
->>> from khipu import model
+
+
+>>> from khipu.test import *
+
+>>> subnetworks, peak_dict, edge_dict = test_read('testdata/full_Feature_table.tsv')
+table headers ordered:  mz rtime
+Read 4016 feature lines
 >>> 
->>> subnetworks, peak_dict, edge_dict = model.peaks_to_networks(flist,)
->>> len(subnetworks)
-672
+>>> big = [g for g in subnetworks if g.size()>8]
 >>> 
->>> len(edge_dict)
-471
-
->>> len([g for g in subnetworks if g.size() < 3])
-461
-
+>>> KP = khipu(big[1], isotope_search_patterns, adduct_search_patterns)
 >>> 
->>> big = [g for g in subnetworks if g.size()>5]
->>> KP = model.khipu()
+>>> KP.build_khipu(peak_dict)
 >>> 
->>> T = KP.build(big[0], peak_dict, edge_dict)
-
-
-
-
-KP = model.khipu(subnetwork, isotope_search_patterns, adduct_search_patterns)
-KP.build_khipu(peak_dict)
-
-if KP.pruned_network:
-    new = 
-
-
-
-
-
-'''
-
-
-
+>>> KP.print_khipu()
+              B0 B1 = F1606 + H
+M0          F195            F20
+13C/12C                     F53
+13C/12C*2                      
+13C/12C*3                      
+13C/12C*4                  F254
+13C/12C*5                 F3271
+13C/12C*6  F3398           F874
 
 
 from pathlib import Path
@@ -54,8 +42,28 @@ path_root = Path(__file__).parents[2]
 sys.path.append(str(path_root))
 print(sys.path)
 
+
+'''
+
 import treelib
+from mass2chem.io import read_features
+
 from .model import khipu
+from .utils import peaks_to_networks
+
+adduct_search_patterns = [(1.0078, 'H'), (21.9820, 'Na/H'), (41.026549, 'Acetonitrile')]
+isotope_search_patterns = [ (1.003355, '13C/12C', (0, 0.8)),
+                                        (2.00671, '13C/12C*2', (0, 0.8)),
+                                        (3.010065, '13C/12C*3', (0, 0.8)),
+                                        (4.01342, '13C/12C*4', (0, 0.8)),
+                                        (5.016775, '13C/12C*5', (0, 0.8)),
+                                        (6.02013, '13C/12C*6', (0, 0.8)),]
+
+def test_read(f='../testdata/full_Feature_table.tsv'):
+    flist = read_features(f, id_col=0, mz_col=1, rtime_col=2, intensity_cols=(11, 17))
+    subnetworks, peak_dict, edge_dict = peaks_to_networks(flist)
+    return subnetworks, peak_dict, edge_dict
+
 
 
 class khipu_interactive(khipu):

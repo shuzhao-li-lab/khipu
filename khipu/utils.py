@@ -248,7 +248,7 @@ def peaks_to_networks(peak_list,
     return subnetworks, peak_dict, edge_dict
 
 
-def realign_isotopes(sorted_mz_peak_ids, isotope_search_patterns):
+def realign_isotopes(sorted_mz_peak_ids, isotope_search_patterns, mz_tolerance=0.01):
     '''To snap isotopic branch. Assume lowest m/z as M0, and re-align other features against M0.
         Because edges in g can be relationship between any pairs. 
         Re-alignment will get them consistent on grid.
@@ -256,7 +256,7 @@ def realign_isotopes(sorted_mz_peak_ids, isotope_search_patterns):
 
     Parameters
     ----------
-    sorted_mz_peak_ids : [(mz, peak_id), ...]
+    sorted_mz_peak_ids : [(mz, peak_id), ...]; must be unique per m/z. khipu.khipu.clean() takes care of that.
     isotope_search_patterns : [ (1.003355, '13C/12C', (0, 0.8)), (3.010065, '13C/12C*3', (0, 0.8)),..]
 
     Returns
@@ -266,15 +266,51 @@ def realign_isotopes(sorted_mz_peak_ids, isotope_search_patterns):
     M0 = sorted_mz_peak_ids[0]
     _d = {'M0': M0[1]}
     for p in sorted_mz_peak_ids[1:]:
-        _d[p[1]] = get_isotope_pattern_name(p[0] - M0[0], isotope_search_patterns)
+        match = get_isotope_pattern_name(p[0] - M0[0], isotope_search_patterns, mz_tolerance)
+        if match == 'Unknown':
+            _d["? " + p[1]] = p[1]
+        else:
+            _d[match] = p[1]
+
     return _d
 
-def get_isotope_pattern_name(mz, isotope_search_patterns):
-    '''Get the isotope with closest m/z match. Not checking error ppm as mz is expected from previous matches.
+def realign_isotopes_reverse(sorted_mz_peak_ids, isotope_search_patterns, mz_tolerance=0.01):
+    '''To snap isotopic branch. Assume lowest m/z as M0, and re-align other features against M0.
+        Because edges in g can be relationship between any pairs. 
+        Re-alignment will get them consistent on grid.
+        No redundant features are allowed here, whihc are handled in khipu.clean().
+
+    Parameters
+    ----------
+    sorted_mz_peak_ids : [(mz, peak_id), ...]; unique per m/z not required, different from realign_isotopes.
+    isotope_search_patterns : [ (1.003355, '13C/12C', (0, 0.8)), (3.010065, '13C/12C*3', (0, 0.8)),..]
+
+    Returns
+    -------
+    A dictionary of {F0: 'M0', F1, '13C/12C*2', ...}
+    '''
+    M0 = sorted_mz_peak_ids[0]
+    _d = {'M0': M0[1]}
+    for p in sorted_mz_peak_ids[1:]:
+        _d[p[1]] = get_isotope_pattern_name(p[0] - M0[0], isotope_search_patterns, mz_tolerance)
+    return _d
+
+def get_isotope_pattern_name(mz, isotope_search_patterns, mz_tolerance=0.01):
+    '''Get the isotope with closest m/z match. 
+    If error > mz_tolerance, return Unknown, 
+    which can happen if the isotope_search_patterns does not cover all possible labled atoms.
+    The mz_tolerance needs not to be too precise, as input value was from isotopic_edges.
     Used by realign_isotopes.
+    Returns
+    -------
+    A name in isotope_search_patterns or 'Unknown'.
     '''
     L = sorted([(abs(mz-x[0]), x[1]) for x in isotope_search_patterns])
-    return L[0][1]
+    if L[0][0] > mz_tolerance:
+        print("Warning no match: ", mz)
+        return 'Unknown'
+    else:
+        return L[0][1]
 
 
 def add_data_to_tag(trees, len_limit=20):

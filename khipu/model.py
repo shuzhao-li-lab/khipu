@@ -95,14 +95,15 @@ class khipu:
             if isotopic_edges and adduct_edges:
                 self.build_full_grid(isotopic_edges, adduct_edges)
             elif isotopic_edges :       # branch only A1 adduct
-                self.build_branch_only_grid(isotopic_edges)
+                self.build_branch_only_grid()
             else:                       # trunk only, no isotopes
                 self.build_trunk_only_grid(adduct_edges)
             
             if check_fitness:
                 self.select_by_fitness()
 
-            self.pruned_network = self.input_network[self.redundant_nodes]
+            self.pruned_network = self.input_network.subgraph(self.redundant_nodes)
+
 
     def build_simple_pair_grid(self, peak_dict):
         '''A khipu of only two nodes (one edge) does not need to go through full grid process,
@@ -130,13 +131,14 @@ class khipu:
         self.nodes_to_use = []
         self.redundant_nodes = []
         
-        self.median_rtime = np.median([[(self.feature_dict[n]['rtime'], n) for n in self.input_network]])
+        self.median_rtime = np.median([self.feature_dict[n]['rtime'] for n in self.input_network])
         for k,v in self.mzstr_dict.items():
+            # v as list of node IDs
             if len(v) == 1:
-                self.nodes_to_use.append(v[0]['id'])
+                self.nodes_to_use.append(v[0])
             else:
                 sorted_by_rtime_match = sorted(
-                    [(abs(n['rtime'] - self.median_rtime), n['id']) for n in v]
+                    [(abs(self.feature_dict[n]['rtime'] - self.median_rtime), n) for n in v]
                 )
                 self.nodes_to_use.append(sorted_by_rtime_match[0][1])
                 self.redundant_nodes += [n[1] for n in sorted_by_rtime_match[1:]]
@@ -181,7 +183,7 @@ class khipu:
     def sort_nodes_by_mz(self):
         '''sort the nodes by increasing m/z
         '''
-        return sorted( [(self.feature_dict[n]['mz'], n) for n in self.input_network.nodes() ])
+        return sorted( [(self.feature_dict[n]['mz'], n) for n in self.nodes_to_use ])
         
 
     def build_full_grid(self, isotopic_edges, adduct_edges):
@@ -210,9 +212,9 @@ class khipu:
         as we do not include lower mz in the initial search.
         A root is not necessarily M0, which may not be detected in perfect labeling experiments.
         '''
-        
-        indexed_adducts, adduct_index_labels, expected_grid_mz_values = self.build_trunk_abstracted(
-            self.branch_abstraction(isotopic_edges, adduct_edges)
+        abstracted_adduct_edges, root_branch = self.branch_abstraction(isotopic_edges, adduct_edges)
+        indexed_adducts, adduct_index_labels, expected_grid_mz_values = self.build_grid_abstracted(
+            abstracted_adduct_edges, root_branch
         )
         self.adduct_index = adduct_index_labels
         self.khipu_grid = self.snap_features_to_grid(expected_grid_mz_values)
@@ -234,7 +236,7 @@ class khipu:
         _ii = 0
         for g in subnetworks:
             for n in g.nodes():
-                _dict_branch[n] = _ii       # node membership is exclusive to subnetwork
+                _dict_branch[n] = "B" + str(_ii)       # node membership is exclusive to subnetwork
             _ii += 1
 
         root_branch = _dict_branch.get(self.root, self.root)
@@ -270,8 +272,10 @@ class khipu:
         DataFrame is better for khipu_grid, because easier to cast data types and keep matrix format.
         Nested list or numpy array is harder to ensure correct matrix format.
         '''
-        expected = np.array(expected_grid_mz_values)
+        expected = np.array(expected_grid_mz_values).T
         khipu_grid = pd.DataFrame( np.empty(expected.shape, dtype=np.str),
+                            index=self.isotope_index,
+                            columns=self.adduct_index,
                             dtype=str)
         for x in self.sorted_mz_peak_ids:
             ii = np.argmin(abs(expected - x[0]))
@@ -280,19 +284,22 @@ class khipu:
         return khipu_grid
 
 
-    def build_branch_only_grid(self, isotopic_edges):
+    def build_branch_only_grid(self):
         '''When there's only a single adduct, this builds a branch for 'A1'.
         isotope_index is fixed based on inital isotope_search_patterns.
-        Updates
-        -------
-        khipu grid, including self.adduct_index, self.khipu_array
-        '''
+        isotopic_edges not needed as we re-align nodes.
+        Updates self.khipu_grid
+
+
         nodes = set([])
         for e in isotopic_edges:
             nodes.add(e[0])
             nodes.add(e[1])
+        
         sorted_mz_peak_ids = sorted([(self.feature_dict[n]['mz'], n) for n in nodes])
-        _d = realign_isotopes(sorted_mz_peak_ids, self.isotope_search_patterns)
+
+        '''
+        _d = realign_isotopes(self.sorted_mz_peak_ids, self.isotope_search_patterns)
         self.khipu_grid = pd.DataFrame.from_dict(
             _d, orient="index", columns=['A1'], dtype=str,
         )
@@ -300,13 +307,14 @@ class khipu:
 
     def build_trunk_only_grid(self, adduct_edges):
         '''When no isotopes, only trunk is needed to describe adducts.
+        Updates self.khipu_grid
         '''
         adduct_edges = nx.minimum_spanning_tree(nx.Graph(adduct_edges)).edges(data=True)
         dict_node_label = {}
         for e in adduct_edges:
             if self.feature_dict[e[0]]['mz'] > self.feature_dict[e[1]]['mz']:
                 e = (e[1], e[0], e[2])
-            dict_node_label[e[1]] = e[1] + ' = ' + e[0] + ' + ' + e[2]['tag']
+            dict_node_label[e[1]] = '(' + e[0] + '+' + e[2]['tag'] + ')'    # e[1] + 
 
         DG = nx.DiGraph(adduct_edges)
         indexed_adducts = list(nx.topological_sort(DG))     # ordered node IDs
@@ -346,6 +354,8 @@ class khipu:
             adduct_mz_dict[a[1]] = a[0]
         for e in abstracted_adduct_edges:
             mz_modification_dict[make_edge_tag((e[0], e[1]))] = adduct_mz_dict[e[2]['tag']]
+            # e[1] + 
+            dict_node_label[e[1]] = '(' + e[0] + '+' + e[2]['tag'] + ')'
 
         DG = nx.DiGraph(abstracted_adduct_edges)
         # walk the graph through all nodes
@@ -355,8 +365,7 @@ class khipu:
             target_mz = node_mz_dict[e[0]] + mz_modification_dict[make_edge_tag((e[0], e[1]))]
             node_mz_dict[e[1]] = target_mz
             trunk_mzlist.append(target_mz)
-            dict_node_label[e[1]] = e[1] + ' = ' + e[0] + ' + ' + e[2]['tag']
-
+            
         adduct_index_labels = [dict_node_label.get(x, x) for x in indexed_adducts]
         expected_grid_mz_values = []
         for A in trunk_mzlist:
