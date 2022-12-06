@@ -1,34 +1,6 @@
 '''
-Comprehensive construction of empCpds via generic tree structures.
-Each annoTree = empCpd["MS1_pseudo_Spectra"].
-
-        subnetwork : undirected graph. Example edges:
-            [('F1606', 'F20', {'type': 'modification', 'tag': 'H'}), 
-            ('F3533', 'F20', {'type': 'modification', 'tag': 'Na/H'}), 
-            ('F195', 'F20', {'type': 'modification', 'tag': 'Acetonitrile'}), 
-            ('F20', 'F807', {'type': 'modification', 'tag': 'Acetonitrile'}), 
-            ('F20', 'F53', {'type': 'isotope', 'tag': '13C/12C'}), 
-            ('F874', 'F808', {'type': 'isotope', 'tag': '13C/12C'})]
-
-        edge_dict : edge_tag: {"source": e[0], "target": e[1], "type": "isotope", "tag": e[2]}
-            edge_tag is str sorted, but the dict values preserve the direction, which is missed in nx.subnetwork.
-
-
-
-    All isotopes of the same adduct form a khipu_string (branch). 
-    All khipu_strings are attached to M0 khipu_rope (trunk).
-
-        self.khipu_grid = {                 # JSON representation of khipu_grid
-            'adduct_index': [],
-            'isotope_index': [],
-            'khipu_matrix': [],
-        }
-
-
-Trees use peak IDs, but full peak data are in json peak lists.
-
-
-# Above only includes isotopic peaks; will add peaks without C13 counterparts into empCpd trees
+Comprehensive construction of empCpds via generic tree structures (khipu).
+Each khipu = empCpd["MS1_pseudo_Spectra"].
 
 # from itertools import combinations
 # import networkx as nx
@@ -53,6 +25,10 @@ class khipu:
         '''Do not include negative m/z difference in this class, as the node of lowest m/z is used as root.
         Neutral loss and fragments can be searched after khipu is established.
         Input subnetwork is undirected graph, but khipu will require directed graph/tree, by increasing m/z.
+        subnetwork : undirected graph. Example edges:
+            ('F3533', 'F20', {'type': 'modification', 'tag': 'Na/H'}), 
+            ('F195', 'F20', {'type': 'modification', 'tag': 'Acetonitrile'}), 
+            ('F20', 'F53', {'type': 'isotope', 'tag': '13C/12C'}), 
         '''
         self.input_network = subnetwork
         self.isotope_search_patterns = isotope_search_patterns
@@ -213,12 +189,14 @@ class khipu:
         A root is not necessarily M0, which may not be detected in perfect labeling experiments.
         '''
         abstracted_adduct_edges, root_branch = self.branch_abstraction(isotopic_edges, adduct_edges)
-        indexed_adducts, adduct_index_labels, expected_grid_mz_values = self.build_grid_abstracted(
-            abstracted_adduct_edges, root_branch
-        )
-        self.adduct_index = adduct_index_labels
-        self.khipu_grid = self.snap_features_to_grid(expected_grid_mz_values)
-
+        try:
+            _, adduct_index_labels, expected_grid_mz_values = self.build_grid_abstracted(
+                abstracted_adduct_edges, root_branch
+            )
+            self.adduct_index = adduct_index_labels
+            self.khipu_grid = self.snap_features_to_grid(expected_grid_mz_values)
+        except KeyError:
+            print("abstracted_adduct_edges, root_branch", abstracted_adduct_edges, root_branch)
 
     def branch_abstraction(self, isotopic_edges, adduct_edges):
         '''Abstract a group of connecgted isotopic featrures into a branch.
@@ -324,8 +302,6 @@ class khipu:
             orient="index", columns=self.adduct_index, dtype=str,
         )
 
-
-
     def build_grid_abstracted(self, abstracted_adduct_edges, root_branch):
         '''Compute grid structure and expected_grid_mz_values.
 
@@ -375,46 +351,85 @@ class khipu:
 
         return indexed_adducts, adduct_index_labels, expected_grid_mz_values
 
-
     def print_khipu(self):
-        '''
-        s = '\t' + '\t'.join(self.khipu_label_list) + '\n'
-        for ii in range(len(self.isotope_index)):
-            s += self.isotope_index + '\t' + '\t'.join(self.khipu_label_list) + '\n'
+        '''Print khipu using adducts as trunk and isotopes as branches (preferred)
         '''
         print(self.khipu_grid)
+        
+    def print_khipu_rotated(self):
+        '''Print khipu using isotopes as trunk and adducts as branches
+        '''
+        print(self.khipu_grid.T)
         
 
     def plot_khipu_diagram(self):
         '''Plot the khipu grid as diagram.
 
         Use MatPlotLib as default engine?
-
-        A khipu grid is a list of isotopic_branch dictionaries. 
-        The list index has a companion list of Adduct labels.
-
-        Use self.sorted_mz_peak_ids. Create node labels as Feature+Adduct.   ??
-
         '''
-        
+        self.abundance_matrix = self.khipu_grid.copy(dtype=int)
+        for a in self.khipu_grid.columns:
+            for m in self.khipu_grid.index:
+                if self.khipu_grid[m, a]:
+                    self.abundance_matrix[m, a] = self.feature_dict[self.khipu_grid[m, a]]['representative_intensity']
+
+        self.abundance_matrix.plot(
+
+            
+        )
 
 
-        self.abundance_matrix = np.zeros((len(self.isotope_index), len(self.adduct_index)))
-
-        for f in self.feature_positions:
-            self.abundance_matrix[f] = self.feature_dict[f]['representative intensity...            ']
 
 
+    def plot_khipu_diagram_rotated(self):
+        pass
 
 
 
 
+    def export_json(self):
+        return self.khipu_grid.to_json()
+
+
+    def format_to_epds(self, id=''):
+        '''Format khipu to empirical compound, with added ion notions.
+        '''
+        if not id:
+            id = 'root@' + self.root
+        features = []
+        for a in self.khipu_grid.columns:
+            for m in self.khipu_grid.index:
+                if self.khipu_grid[m, a]:
+                    ion = self.feature_dict[self.khipu_grid[m, a]]
+                    ion['isotope'] = m
+                    ion['modification':] = a
+                    ion['ion_relation'] = ','.join([m, a])
+            features.append( ion )
+
+        return {
+            'interim_id': id, 
+            'neutral_formula_mass': None,
+            'neutral_formula': None,
+            'Database_referred': [],
+            'identity': [],
+            'MS1_pseudo_Spectra': features,
+            'MS2_Spectra': [],
+            }
+
+
+    #---------- shorthand names --------------
+    print = print_khipu
+    print2 = print_khipu_rotated
+    plot = plot_khipu_diagram
+    plot2 = plot_khipu_diagram_rotated
+
+
+    #---------- placeholders --------------
     def select_by_fitness(self):
         '''After a khipu frame is built, among redundant features, 
         select the ones of best fitness score for the khipu.        
         '''
         pass
-
 
     def fitness(self):
         '''Fitness function of the khipu. 
@@ -426,18 +441,3 @@ class khipu:
         Default to a) is good enough for now.
         '''
         pass
-
-
-    def export_json(self):
-        return self.khipu_grid.to_json()
-
-
-    def format_to_epds(self):
-        '''
-        Add to 'ion_relation' - 'isotope': [M0, C13*M3..], 'modification': ['-CO2', ...]
-
-
-        '''
-        pass
-
-

@@ -207,7 +207,8 @@ def peaks_to_networks(peak_list,
         ('F20', 'F53', {'type': 'isotope', 'tag': '13C/12C'}), 
         ('F874', 'F808', {'type': 'isotope', 'tag': '13C/12C'})]
 
-    peak_dict, edge_dict
+    peak_dict : JSON peaks indexed by ID
+    edge_dict : edge_tag is str sorted, but the dict values preserve the direction, which is missed in nx.subnetwork.
 
     Notes
     -----

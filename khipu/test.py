@@ -36,11 +36,26 @@ M0          F195            F20
 13C/12C*6  F3398           F874
 
 
+for g in big[20:]:
+   KP = khipu(g, isotope_search_patterns, adduct_search_patterns)
+   KP.build_khipu(peak_dict)
+   print(KP.sorted_mz_peak_ids, "\n")
+   KP.print_khipu()
+   print('\n\n')
+
+
+
+
+
+
+
+
 from pathlib import Path
 import sys
 path_root = Path(__file__).parents[2]
 sys.path.append(str(path_root))
 print(sys.path)
+
 
 
 '''

@@ -63,7 +63,8 @@ We can
 4. Visualization within khipu library is limited to tree and matrix printing in plain text. Plot functions of isotopologues and adducts will be in plotly and notebooks, not in this library.
 
 
-## The khipus are used as empirical compounds in our computational libraries (https://github.com/shuzhao-li/metDataModel), which can be annotated by customized methods, e.g.
+## The khipus are used as empirical compounds 
+- in our computational libraries (https://github.com/shuzhao-li/metDataModel), which can be annotated by customized methods, e.g.
 - in-house compound library
 - targeted pathway search
 - public databases
