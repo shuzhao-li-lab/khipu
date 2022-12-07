@@ -4,10 +4,10 @@ Each khipu = empCpd["MS1_pseudo_Spectra"].
 
 # from itertools import combinations
 # import networkx as nx
+import json
 import treelib
 '''
 
-import json
 import numpy as np
 import pandas as pd
 
@@ -65,7 +65,7 @@ class khipu:
             for e in self.input_network.edges(data=True):
                 if e[2]['type'] == 'isotope':
                     isotopic_edges.append(e)
-                else:           # no other type of connections are allowed 
+                else:                   # no other type of connections are allowed 
                     adduct_edges.append(e)
             
             if isotopic_edges and adduct_edges:
@@ -78,6 +78,7 @@ class khipu:
             if check_fitness:
                 self.select_by_fitness()
 
+        if self.redundant_nodes:
             self.pruned_network = self.input_network.subgraph(self.redundant_nodes)
 
 
@@ -195,7 +196,9 @@ class khipu:
             )
             self.adduct_index = adduct_index_labels
             self.khipu_grid = self.snap_features_to_grid(expected_grid_mz_values)
-        except KeyError:
+        except KeyError as e:
+            print("Error occured, ", self.root)
+            print(e)
             print("abstracted_adduct_edges, root_branch", abstracted_adduct_edges, root_branch)
 
     def branch_abstraction(self, isotopic_edges, adduct_edges):
@@ -379,12 +382,8 @@ class khipu:
         )
 
 
-
-
     def plot_khipu_diagram_rotated(self):
         pass
-
-
 
 
     def export_json(self):
@@ -422,7 +421,6 @@ class khipu:
     print2 = print_khipu_rotated
     plot = plot_khipu_diagram
     plot2 = plot_khipu_diagram_rotated
-
 
     #---------- placeholders --------------
     def select_by_fitness(self):

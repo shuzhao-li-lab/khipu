@@ -3,7 +3,7 @@
 This applies to regular LC-MS data, but also enables easy analysis of isotope tracing and chemical labeling data.
 
 
-## Algorithmic consideration: the depth of trees: 
+## Algorithmic consideration: the depth of trees
 Relation btw different number of labels? M3 is not parent of M4 - they are children of root and at the same level.
 How many levels of adducts? This should be 1 because adduct formation is one-time event in ESI.
 Thus, annoTree should have 2-levels: isotopes and adducts. 
@@ -63,7 +63,7 @@ We can
 4. Visualization within khipu library is limited to tree and matrix printing in plain text. Plot functions of isotopologues and adducts will be in plotly and notebooks, not in this library.
 
 
-## The khipus are used as empirical compounds 
+## Khipus are used as empirical compounds 
 - in our computational libraries (https://github.com/shuzhao-li/metDataModel), which can be annotated by customized methods, e.g.
 - in-house compound library
 - targeted pathway search

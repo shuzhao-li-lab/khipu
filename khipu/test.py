@@ -11,14 +11,18 @@ Read 4016 feature lines
 4016 {'id': 'F6', 'mz': 117.0659, 'rtime': 148.54, 'intensities': [5630973.0, 321067.0, 237998.0, 97759.0], 'representative_intensity': 1571949.25}
 >>> 
 
-
-
 >>> from khipu.test import *
 
 >>> subnetworks, peak_dict, edge_dict = test_read('testdata/full_Feature_table.tsv')
 table headers ordered:  mz rtime
 Read 4016 feature lines
 >>> 
+
+>>> subnetworks, peak_dict, edge_dict = test_read_url()
+Retrieving test data from GitHub.
+table headers ordered:  mz rtime
+Read 4016 feature lines
+
 >>> big = [g for g in subnetworks if g.size()>8]
 >>> 
 >>> KP = khipu(big[1], isotope_search_patterns, adduct_search_patterns)
@@ -36,20 +40,6 @@ M0          F195            F20
 13C/12C*6  F3398           F874
 
 
-for g in big[20:]:
-   KP = khipu(g, isotope_search_patterns, adduct_search_patterns)
-   KP.build_khipu(peak_dict)
-   print(KP.sorted_mz_peak_ids, "\n")
-   KP.print_khipu()
-   print('\n\n')
-
-
-
-
-
-
-
-
 from pathlib import Path
 import sys
 path_root = Path(__file__).parents[2]
@@ -57,14 +47,13 @@ sys.path.append(str(path_root))
 print(sys.path)
 
 
-
 '''
-
+import urllib.request
 import treelib
-from mass2chem.io import read_features
+import numpy as np
 
 from .model import khipu
-from .utils import peaks_to_networks
+from .utils import *
 
 adduct_search_patterns = [(1.0078, 'H'), (21.9820, 'Na/H'), (41.026549, 'Acetonitrile')]
 isotope_search_patterns = [ (1.003355, '13C/12C', (0, 0.8)),
@@ -74,31 +63,78 @@ isotope_search_patterns = [ (1.003355, '13C/12C', (0, 0.8)),
                                         (5.016775, '13C/12C*5', (0, 0.8)),
                                         (6.02013, '13C/12C*6', (0, 0.8)),]
 
-def test_read(f='../testdata/full_Feature_table.tsv'):
+
+def test_read_file(f='../testdata/full_Feature_table.tsv'):
+    '''Use from mass2chem.io import read_features
+    '''
     flist = read_features(f, id_col=0, mz_col=1, rtime_col=2, intensity_cols=(11, 17))
     subnetworks, peak_dict, edge_dict = peaks_to_networks(flist)
     return subnetworks, peak_dict, edge_dict
 
+def test_read_url(url='https://github.com/shuzhao-li/khipu/raw/main/testdata/full_Feature_table.tsv'):
+    print("Retrieving test data from GitHub.")
+    data = urllib.request.urlopen(url).read().decode('utf-8')
+    flist = read_features_from_text(data, id_col=0, mz_col=1, rtime_col=2, intensity_cols=(11, 17))
+    subnetworks, peak_dict, edge_dict = peaks_to_networks(flist)
+    return subnetworks, peak_dict, edge_dict
+
+def read_features_from_text(text_table, 
+                        id_col=0, mz_col=1, rtime_col=2, 
+                        intensity_cols=(3,4), delimiter="\t"):
+    '''
+    Read a text feature table into a list of features.
+    Input
+    -----
+    text_table: Tab delimited feature table read as text. First line as header.
+                    Recommended col 0 for ID, col 1 for m/z, col 2 for rtime.
+    id_col: column for id. If feature ID is not given, row_number is used as ID.
+    mz_col: column for m/z.
+    rtime_col: column for retention time.
+    intensity_cols: range of columns for intensity values. E.g. (3,5) includes only col 3 and 4.
+    Return
+    ------
+    List of features: [{'id': '', 'mz': 0, 'rtime': 0, 
+                        intensities: [], 'representative_intensity': 0, ...}, 
+                        ...], 
+                        where representative_intensity is mean value.
+    '''
+    # featureLines = open(feature_table).read().splitlines()
+    featureLines = text_table.splitlines()
+    header = featureLines[0].split(delimiter)
+    num_features = len(featureLines)-1
+    # sanity check
+    print("table headers ordered: ", header[mz_col], header[rtime_col])
+    print("Read %d feature lines" %num_features)
+    L = []
+    for ii in range(1, num_features+1):
+        if featureLines[ii].strip():
+            a = featureLines[ii].split(delimiter)
+            if isinstance(id_col, int):         # feature id specified
+                iid = a[id_col]
+            else:
+                iid = 'row'+str(ii)
+            xstart, xend = intensity_cols
+            intensities = [float(x) for x in a[xstart: xend]]
+            L.append({
+                'id': iid, 'mz': float(a[mz_col]), 'rtime': float(a[rtime_col]),
+                'intensities': intensities,
+                'representative_intensity': np.mean(intensities),
+            })
+    return L
 
 
-class khipu_interactive(khipu):
+class khipu_diagnosis(khipu):
+    '''Added diagnostic functions to khipu class.
+    They should be run after khipu.build_khipu().
+    '''
+    def show_trimming(self):
+        '''Show what nodes are removed from input_network. After running self.build_khipu.
+        '''
+        print("nodes_to_use: ", self.nodes_to_use)
+        print("redundant_nodes: ", self.redundant_nodes)
 
-    def plot(self):
-        pass
-
-
-    def to_dataframe(self):
-        pass
-
-
-        
-    def build_diagnostic_tree(self, peak_dict, depth_limit = 10):
-        '''Build diagnostic tree before assigning nodes to grid and khipu diagram.
-
-        Parameters
-        ----------
-        peak_dict : peaks (features) indexed by id.
-        self.minimum_spanning_tree : minimum_spanning_tree from initial subnetwork
+    def build_diagnostic_tree(self, input_network, depth_limit = 10):
+        '''Build diagnostic tree using input nodes.
 
         Updates
         -------
@@ -106,14 +142,6 @@ class khipu_interactive(khipu):
 
         Examples (tree here is diagnostic_tree)
         --------
-        >>> from mass2chem.io import read_features
-        >>> from khipu import model
-        >>> f = 'testdata/full_Feature_table.tsv'
-        >>> flist = read_features(f, id_col=0, mz_col=1, rtime_col=2, intensity_cols=(11, 17))
-        table headers ordered:  mz rtime
-        Read 4016 feature lines
-        >>> subnetworks, peak_dict, edge_dict = model.peaks_to_networks(flist,)
-        >>> big = [g for g in subnetworks if g.size()>5]
         >>> KP = model.khipu()
         >>> KP.build_tree(big[0], peak_dict, edge_dict)
         >>> 
@@ -145,13 +173,10 @@ class khipu_interactive(khipu):
         -----
         A minimum_spanning_tree will have all necessary patterns to cover full khipu, but not unique pattern.
         '''
+        T = nx.minimum_spanning_tree(input_network)
+        peak_dict = self.feature_dict
         tree = treelib.Tree()
         root_node = self.root
-
-
-        T = self.minimum_spanning_tree
-
-
         tree.create_node(make_peak_tag(peak_dict[root_node]), root_node, data=peak_dict[root_node])
 
         for node in T[root_node]:
@@ -173,8 +198,59 @@ class khipu_interactive(khipu):
             remaining = tmp
             depth_limit -= 1
 
-        self.diagnostic_tree = tree
         if remaining:
             print(remaining)
 
+        return tree
+
+    def build_diagnostic_tree_full(self):
+        self.diagnostic_tree = self.build_diagnostic_tree(self.input_network)
+        print("Diagnostic tree with all input nodes: ")
+        self.diagnostic_tree.show()
+
+    def build_diagnostic_tree_clean(self):
+        self.clean_tree = self.build_diagnostic_tree(
+                                        self.input_network.subgraph(self.nodes_to_use))
+        print("Minimal khipu tree: ")
+        self.clean_tree.show()
+
+
+    def plot(self):
+        pass
+
+    def to_dataframe(self):
+        pass
+
+
+#
+# -----------------------------------------------------------------------------
+#
+if __name__ == '__main__':
+    subnetworks, peak_dict, edge_dict = test_read_url()
+    big = [g for g in subnetworks if g.size()>8]
+
+    print("\n\n")
+    print("Example khipu of one empirical compound from demo data.")
+    KP = khipu_diagnosis(big[11], isotope_search_patterns, adduct_search_patterns)
+    KP.build_khipu(peak_dict)
+    KP.show_trimming()
+    
+    KP.build_diagnostic_tree_full()
+
+    print("Looking at khipu: ")
+    KP.print()
+    print("\n\n")
+    print("Rotated way to look at khipu: ")
+    KP.print2()
+    print("\n\n")
+    KP.build_diagnostic_tree_clean()
+
+    print("\n\n")
+    print("Multiple example khipus: ")
+    for g in big[-10:]:
+        KP = khipu(g, isotope_search_patterns, adduct_search_patterns)
+        KP.build_khipu(peak_dict)
+        print(KP.sorted_mz_peak_ids, "\n")
+        KP.print_khipu()
+        print('\n\n')
 
