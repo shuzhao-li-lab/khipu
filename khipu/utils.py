@@ -16,7 +16,7 @@ def make_edge_tag(edge):
     if edge[0] > edge[1]:
         return edge[1] + '_' + edge[0]
     else:
-        edge[0] + '_' + edge[1]
+        return edge[0] + '_' + edge[1]
 
 def make_peak_dict(peak_list):
     '''

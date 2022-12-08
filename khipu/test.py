@@ -46,6 +46,8 @@ path_root = Path(__file__).parents[2]
 sys.path.append(str(path_root))
 print(sys.path)
 
+➜  khipu git:(main) ✗ python3 -m khipu.test
+
 
 '''
 import urllib.request
@@ -231,10 +233,10 @@ if __name__ == '__main__':
 
     print("\n\n")
     print("Example khipu of one empirical compound from demo data.")
-    KP = khipu_diagnosis(big[11], isotope_search_patterns, adduct_search_patterns)
+    KP = khipu_diagnosis(big[-4], isotope_search_patterns, adduct_search_patterns)
     KP.build_khipu(peak_dict)
     KP.show_trimming()
-    
+    print("\n\n")
     KP.build_diagnostic_tree_full()
 
     print("Looking at khipu: ")
@@ -247,6 +249,7 @@ if __name__ == '__main__':
 
     print("\n\n")
     print("Multiple example khipus: ")
+    print("======================== \n")
     for g in big[-10:]:
         KP = khipu(g, isotope_search_patterns, adduct_search_patterns)
         KP.build_khipu(peak_dict)

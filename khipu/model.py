@@ -61,8 +61,9 @@ class khipu:
             self.build_simple_pair_grid(peak_dict)
         else:
             self.clean(peak_dict, mz_tolerance_ppm)
+            self.clean_network = self.input_network.subgraph(self.nodes_to_use)
             isotopic_edges, adduct_edges = [], []
-            for e in self.input_network.edges(data=True):
+            for e in self.clean_network.edges(data=True):
                 if e[2]['type'] == 'isotope':
                     isotopic_edges.append(e)
                 else:                   # no other type of connections are allowed 
@@ -190,16 +191,11 @@ class khipu:
         A root is not necessarily M0, which may not be detected in perfect labeling experiments.
         '''
         abstracted_adduct_edges, root_branch = self.branch_abstraction(isotopic_edges, adduct_edges)
-        try:
-            _, adduct_index_labels, expected_grid_mz_values = self.build_grid_abstracted(
-                abstracted_adduct_edges, root_branch
-            )
-            self.adduct_index = adduct_index_labels
-            self.khipu_grid = self.snap_features_to_grid(expected_grid_mz_values)
-        except KeyError as e:
-            print("Error occured, ", self.root)
-            print(e)
-            print("abstracted_adduct_edges, root_branch", abstracted_adduct_edges, root_branch)
+        _, adduct_index_labels, expected_grid_mz_values = self.build_grid_abstracted(
+            abstracted_adduct_edges, root_branch
+        )
+        self.adduct_index = adduct_index_labels
+        self.khipu_grid = self.snap_features_to_grid(expected_grid_mz_values)
 
     def branch_abstraction(self, isotopic_edges, adduct_edges):
         '''Abstract a group of connecgted isotopic featrures into a branch.
