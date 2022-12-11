@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-  name='khipu',
+  name='khipu-metabolomics',
   version=__version__,
 
   author='Shuzhao Li',
@@ -42,6 +42,7 @@ setup(
   install_requires=[
     'mass2chem',
     'treelib',
+    'networkx'
   ],
 
   python_requires='>=3.7',
