@@ -6,6 +6,9 @@ Each khipu = empCpd["MS1_pseudo_Spectra"].
 # import networkx as nx
 import json
 import treelib
+
+#import matplotlib.pyplot as plt
+
 '''
 
 import numpy as np
@@ -388,22 +391,28 @@ class khipu:
         '''
         print(self.khipu_grid.T)
         
+    def get_khipu_intensities(self):
+        '''Return abundance_matrix as DataFrame in same layout as self.khipu_grid
+        '''
+        (_M, _N) = self.khipu_grid.shape
+        abundance_matrix = pd.DataFrame(data=np.zeros(shape=(_M, _N)),
+                            index=self.isotope_index,
+                            columns=self.adduct_index_labels,
+        )
+        for ii in range(_M):
+            for jj in range(_N):
+                if self.khipu_grid.iloc[ii,jj]:
+                    abundance_matrix.iloc[ii, jj] = self.feature_dict[self.khipu_grid.iloc[ii,jj]
+                                                                ]['representative_intensity']
+        return abundance_matrix
 
     def plot_khipu_diagram(self):
         '''Plot the khipu grid as diagram.
-
         Use MatPlotLib as default engine?
+
         '''
-        self.abundance_matrix = self.khipu_grid.copy(dtype=int)
-        for a in self.khipu_grid.columns:
-            for m in self.khipu_grid.index:
-                if self.khipu_grid[m, a]:
-                    self.abundance_matrix[m, a] = self.feature_dict[self.khipu_grid[m, a]]['representative_intensity']
-
-        self.abundance_matrix.plot(
-
-            
-        )
+        abundance_matrix = np.log2( self.get_khipu_intensities() + 1 )
+        abundance_matrix.plot()
 
 
     def plot_khipu_diagram_rotated(self):

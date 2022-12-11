@@ -269,6 +269,8 @@ if __name__ == '__main__':
     print("\n\n")
     KP.build_diagnostic_tree_clean()
 
+    KP.plot_khipu_diagram()
+
     print("\n\n")
     print("Multiple example khipus: ")
     print("======================== \n")
