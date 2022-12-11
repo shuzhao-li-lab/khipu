@@ -104,6 +104,8 @@ class khipu:
         '''Clean up the input subnetwork, only using unique features to build a khipu frame.
         Redundant features are kept aside. 
         The leftover features are sent off to build new khipus.
+        Note: mzstr_dict can be problematic in data that were not processed well, 
+        because minor potential shift can confuse ion relations.
         '''
         self.feature_dict, self.mzstr_dict = self.get_feature_dict(peak_dict, mz_tolerance_ppm)
         self.nodes_to_use = []
@@ -128,7 +130,7 @@ class khipu:
     def get_feature_dict(self, peak_dict, mz_tolerance_ppm):
         '''Index all input features; establish str identifier for features of same/close m/z values.
         Base on asari mass track IDs; keep unique m/z only.
-        It's more efficient to use, since feature_dict is much smaller than peak_dict
+        It's more efficient to use, since feature_dict is much smaller than peak_dict.
 
         Parameters
         ----------
@@ -141,7 +143,6 @@ class khipu:
         feature_dict : feature_dict with 'parent_masstrack_id'.
         mzstr_dict : dict indexed by parent_masstrack_id, e.g. {'trackx': [f1, f2], ...}
         '''
-        
         feature_dict, mzstr_dict = {}, {}
         for n in self.input_network.nodes():
             feature_dict[n] = peak_dict[n]
@@ -190,30 +191,41 @@ class khipu:
         as we do not include lower mz in the initial search.
         A root is not necessarily M0, which may not be detected in perfect labeling experiments.
         '''
-        abstracted_adduct_edges, root_branch = self.branch_abstraction(isotopic_edges, adduct_edges)
-        _, adduct_index_labels, expected_grid_mz_values = self.build_grid_abstracted(
+        abstracted_adduct_edges, root_branch, branch_dict = self.branch_abstraction(
+            isotopic_edges, adduct_edges
+        )
+        indexed_adducts, adduct_index_labels, expected_grid_mz_values = self.build_grid_abstracted(
             abstracted_adduct_edges, root_branch
         )
-        self.adduct_index = adduct_index_labels
-        self.khipu_grid = self.snap_features_to_grid(expected_grid_mz_values)
+        self.adduct_index = indexed_adducts
+        self.adduct_index_labels = adduct_index_labels
+        self.khipu_grid = self.snap_features_to_grid(branch_dict, expected_grid_mz_values)
 
     def branch_abstraction(self, isotopic_edges, adduct_edges):
         '''Abstract a group of connecgted isotopic featrures into a branch.
         Reduce the input network to a set of abstracted_adduct_edges (hence new tree) of B-nodes.
-        Membership of B-nodes is not returned, because all the feature nodes will be realigned to khipu grid.
-
+        
         Returns
         -------
         abstracted_adduct_edges : list of nonredundant directed edges with data tag
         root_branch : ID of the branch where root feature (lowest m/z) resides
+        branch_dict : dictionary, branch ID to member features/nodes.
+
+        Notes
+        -----
+        Membership of B-nodes is returned as branch_dict, which is needed to realign to khipu grid.
+        Without branch constraint, the grid realignment is error prone.
         '''
         G = nx.Graph(isotopic_edges)
         subnetworks = [G.subgraph(c).copy() for c in nx.connected_components(G)]
-        _dict_branch = {}
+        _dict_branch, branch_dict = {}, {}
         _ii = 0
         for g in subnetworks:
-            for n in g.nodes():
-                _dict_branch[n] = "B" + str(_ii)       # node membership is exclusive to subnetwork
+            nodes = list(g.nodes())
+            branch_id = "B" + str(_ii)
+            branch_dict[branch_id] = nodes
+            for n in nodes:
+                _dict_branch[n] =  branch_id      # node membership is exclusive to subnetwork
             _ii += 1
 
         root_branch = _dict_branch.get(self.root, self.root)
@@ -231,14 +243,17 @@ class khipu:
                 abstracted_adduct_edges.append(e)
                 tracker.append(tt)
 
-        return abstracted_adduct_edges, root_branch
+        return abstracted_adduct_edges, root_branch, branch_dict
 
 
-    def snap_features_to_grid(self, expected_grid_mz_values):
+    def snap_features_to_grid(self, branch_dict, expected_grid_mz_values):
         '''Create khipu_grid. To snap each feature to the expected_grid_mz_values.
+
         Parameters
         ----------
-        expected_grid_mz_values : m/z values in a list of branches.
+        branch_dict : dictionary, branch ID to member features/nodes.
+        expected_grid_mz_values : m/z values in a list of branches. 
+            List of lists, _N x _M, in same order as self.adduct_index.
 
         Returns
         -------
@@ -248,15 +263,27 @@ class khipu:
         -----
         DataFrame is better for khipu_grid, because easier to cast data types and keep matrix format.
         Nested list or numpy array is harder to ensure correct matrix format.
+            The algorithm here has to respect established edges to avoid confusion. 
+        self.adduct_index and branch_dict define memberships in each adduct group.
+        The method below is very error prone:
+            for x in self.sorted_mz_peak_ids:
+                ii = np.argmin(abs(expected - x[0]))
+                khipu_grid.iloc[np.unravel_index(ii, expected.shape)] = x[1]
         '''
-        expected = np.array(expected_grid_mz_values).T
-        khipu_grid = pd.DataFrame( np.empty(expected.shape, dtype=np.str),
+        _M, _N = len(self.isotope_index), len(self.adduct_index)
+        khipu_grid = pd.DataFrame( np.empty((_M, _N), dtype=np.str),
                             index=self.isotope_index,
-                            columns=self.adduct_index,
+                            columns=self.adduct_index_labels ,                  # adduct_index
                             dtype=str)
-        for x in self.sorted_mz_peak_ids:
-            ii = np.argmin(abs(expected - x[0]))
-            khipu_grid.iloc[np.unravel_index(ii, expected.shape)] = x[1]
+        for jj in range(_N):
+            # get cooridnate for each matched isotope
+            if self.adduct_index[jj] in branch_dict:
+                isotopes = branch_dict[self.adduct_index[jj]]
+            else:
+                isotopes = [self.adduct_index[jj]]                      # single feature
+            for F in isotopes:
+                ii = np.argmin([abs(x-self.feature_dict[F]['mz']) for x in expected_grid_mz_values[jj]])
+                khipu_grid.iloc[ii, jj] = F
 
         return khipu_grid
 
@@ -311,7 +338,7 @@ class khipu:
 
         Returns
         -------
-        indexed_adducts : a list containing ordered adducts
+        indexed_adducts : a list containing ordered adducts (some are abstracted branches)
         adduct_index_labels : annotation companion to adduct_index, list of same node order
         expected_grid_mz_values : calculated m/z values for khipu grid based on self.root, indexed_adducts 
             and self.isotope_search_patterns.
@@ -333,11 +360,12 @@ class khipu:
             dict_node_label[e[1]] = '(' + e[0] + '+' + e[2]['tag'] + ')'
 
         DG = nx.DiGraph(abstracted_adduct_edges)
-        # walk the graph through all nodes
+        # walk the graph through all nodes, and build trunk in that order
         indexed_adducts, trunk_mzlist = [root_branch, ], [root_mz, ]
         for e in nx.dfs_edges(DG, source=root_branch):
             indexed_adducts.append(e[1])
             target_mz = node_mz_dict[e[0]] + mz_modification_dict[make_edge_tag((e[0], e[1]))]
+            # e[0] is guanranteed to be in node_mz_dict due to the tree walking order
             node_mz_dict[e[1]] = target_mz
             trunk_mzlist.append(target_mz)
             

@@ -60,7 +60,9 @@ def assign_masstrack_ids_in_khipu(feature_dict, mz_tolerance_ppm=5):
     Sort by m/z; separate by mz_tolerance_ppm.
     m/z has to be check by ppm because 1) minor variation may exist btw peaks; and 
     2) float numbers are bad for dictionary keys.
-    This method may accidently merge m/z regions in rare situations in extremely bad data.
+    This method can be occasionally problematic in data that were not processed well,
+    by accidently merging m/z regions, therefore causing problems in downstream determination of ion relations.
+    (Why mass track is good in asari.)
     '''
     features = sorted([(feature_dict[n]['mz'], n) for n in feature_dict])
     _N = len(features)

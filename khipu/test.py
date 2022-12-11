@@ -211,10 +211,30 @@ class khipu_diagnosis(khipu):
         self.diagnostic_tree.show()
 
     def build_diagnostic_tree_clean(self):
-        self.clean_tree = self.build_diagnostic_tree(
-                                        self.input_network.subgraph(self.nodes_to_use))
+        self.clean_tree = self.build_diagnostic_tree(self.clean_network)
         print("Minimal khipu tree: ")
         self.clean_tree.show()
+
+
+    def snap_features_to_grid_by_best_mz(self, expected_grid_mz_values):
+        '''Alternative method to create khipu_grid, by best matching each feature to the expected_grid_mz_values.
+        This has major problems when there's confusion btw close values, 
+        as expected_grid_mz_values can also be shifted by measurement error in root m/z.
+        '''
+        expected = np.array(expected_grid_mz_values).T
+        khipu_grid = pd.DataFrame( np.empty(expected.shape, dtype=np.str),
+                            index=self.isotope_index,
+                            columns=self.adduct_index,
+                            dtype=str)
+
+        for x in self.sorted_mz_peak_ids:
+            ii = np.argmin(abs(expected - x[0]))
+            khipu_grid.iloc[np.unravel_index(ii, expected.shape)] = x[1]
+
+
+
+
+        return khipu_grid
 
 
     def plot(self):
@@ -233,8 +253,10 @@ if __name__ == '__main__':
 
     print("\n\n")
     print("Example khipu of one empirical compound from demo data.")
-    KP = khipu_diagnosis(big[-4], isotope_search_patterns, adduct_search_patterns)
+    KP = khipu_diagnosis(big[ -4 ], isotope_search_patterns, adduct_search_patterns)
+    print(KP.input_network.edges(data=True))
     KP.build_khipu(peak_dict)
+    print(KP.sorted_mz_peak_ids, "\n")
     KP.show_trimming()
     print("\n\n")
     KP.build_diagnostic_tree_full()
@@ -250,7 +272,7 @@ if __name__ == '__main__':
     print("\n\n")
     print("Multiple example khipus: ")
     print("======================== \n")
-    for g in big[-10:]:
+    for g in big[ -10: ]:
         KP = khipu(g, isotope_search_patterns, adduct_search_patterns)
         KP.build_khipu(peak_dict)
         print(KP.sorted_mz_peak_ids, "\n")
