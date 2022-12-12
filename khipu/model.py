@@ -2,12 +2,11 @@
 Comprehensive construction of empCpds via generic tree structures (khipu).
 Each khipu = empCpd["MS1_pseudo_Spectra"].
 
-# from itertools import combinations
-# import networkx as nx
-import json
-import treelib
+To-Dos:
 
-#import matplotlib.pyplot as plt
+- update adduct rules. Not allowing multiplication of adduct instances?? 
+- demo notebooks
+- 
 
 '''
 
@@ -202,6 +201,7 @@ class khipu:
         )
         self.adduct_index = indexed_adducts
         self.adduct_index_labels = adduct_index_labels
+        self.branch_dict = branch_dict
         self.khipu_grid = self.snap_features_to_grid(branch_dict, expected_grid_mz_values)
 
     def branch_abstraction(self, isotopic_edges, adduct_edges):

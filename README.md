@@ -15,6 +15,7 @@ In theory, multiple ions are measured in mass spectrometry for one origin compou
 because of two factors:
 1) isotopes exists for atoms, which have difference mass values; and
 2) modifications occur during the mass spectrometry analysis, including formation of adducts, ionization, in-source fragmentation and neutral loss.
+
 Each ion is a result of combination of these two factors, and can be attributed to the origin compound.
 Therefore, the ions can be adequately represented as a "leaf" on a tree, root being the origin compound.
 
