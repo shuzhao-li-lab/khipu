@@ -6,7 +6,9 @@ To-Dos:
 
 - update adduct rules. Not allowing multiplication of adduct instances?? 
 - demo notebooks
-- 
+- extended adducts
+- automate full feature table annotation
+- order trunk by m/z ??
 
 '''
 
@@ -36,13 +38,17 @@ class khipu:
         self.isotope_search_patterns = isotope_search_patterns
         self.adduct_search_patterns = adduct_search_patterns
 
+        self.nodes_to_use = []
+        self.annotation_dict = {}
+        self.redundant_nodes = []
+        self.pruned_network = None
+
         self.adduct_index = []
         self.isotope_index = ['M0'] + [x[1] for x in isotope_search_patterns]
         self.khipu_grid = []                # DataFrame of N x M, M number of isotopes, N number of adducts
                                             # M is explicitly specified during search
                                             # N is dynamically determined on each khipu
 
-        self.pruned_network = None        
         self.is_13C_verified = False
         self.is_singleton = False
 
@@ -58,12 +64,25 @@ class khipu:
         -------
         self.khipu_grid : pd.DataFrame
         
+
+            # clean() may cut some edges
+            new_nodes = self.clean_network.nodes()
+            for n in self.nodes_to_use:
+                if n not in new_nodes:
+                    self.redundant_nodes.append(n)
+            self.nodes_to_use = new_nodes
+
+
         '''
-        if self.input_network.size() == 2:
+        self.feature_dict, self.mzstr_dict = self.get_feature_dict(peak_dict, mz_tolerance_ppm)
+        if self.input_network.number_of_edges() == 1:
             self.build_simple_pair_grid(peak_dict)
+            self.clean_network = self.input_network
         else:
-            self.clean(peak_dict, mz_tolerance_ppm)
+            self.clean()
             self.clean_network = self.input_network.subgraph(self.nodes_to_use)
+
+
             isotopic_edges, adduct_edges = [], []
             for e in self.clean_network.edges(data=True):
                 if e[2]['type'] == 'isotope':
@@ -89,30 +108,30 @@ class khipu:
         '''A khipu of only two nodes (one edge) does not need to go through full grid process,
         and is formatted here. The full grid process would work for these simple cases, but less efficient.
         '''
-        e = self.input_network.edges()[0]
+        e = self.input_network.edges(data=True)[0]
         if peak_dict[e[0]]['mz'] > peak_dict[e[1]]['mz']:
-            e[0], e[1] = e[1], e[0]
+            e = (e[1], e[0], e[2])
+        self.root = e[0]
         if e[2]['type'] == 'isotope':
             self.khipu_grid = pd.DataFrame( {'A1': [e[0], e[1]]},
                             index=['M0', e[2]['tag']], 
                             dtype=str)
+            self.annotation_dict[e[0]] = ('M0', 'A1')
+            self.annotation_dict[e[1]] = (e[2]['tag'], 'A1')
         else:           # adduct
             self.khipu_grid = pd.DataFrame( {'A1': [e[0]], e[2]['tag']: [e[1]]},
                             index=['M0',], 
                             dtype=str)
+            self.annotation_dict[e[0]] = ('M0', 'A1')
+            self.annotation_dict[e[1]] = ('M0', e[2]['tag'])
 
-
-    def clean(self, peak_dict, mz_tolerance_ppm):
+    def clean(self):
         '''Clean up the input subnetwork, only using unique features to build a khipu frame.
         Redundant features are kept aside. 
         The leftover features are sent off to build new khipus.
         Note: mzstr_dict can be problematic in data that were not processed well, 
         because minor potential shift can confuse ion relations.
         '''
-        self.feature_dict, self.mzstr_dict = self.get_feature_dict(peak_dict, mz_tolerance_ppm)
-        self.nodes_to_use = []
-        self.redundant_nodes = []
-        
         self.median_rtime = np.median([self.feature_dict[n]['rtime'] for n in self.input_network])
         for k,v in self.mzstr_dict.items():
             # v as list of node IDs
@@ -258,6 +277,10 @@ class khipu:
         expected_grid_mz_values : m/z values in a list of branches. 
             List of lists, _N x _M, in same order as self.adduct_index.
 
+        Updates
+        -------
+        self.annotation_dict : the isotope and adduct notions for each feature
+
         Returns
         -------
         khipu_grid : pd.DataFrame, adducts as cols (trunk) and isotopes as rows (branches).
@@ -287,6 +310,7 @@ class khipu:
             for F in isotopes:
                 ii = np.argmin([abs(x-self.feature_dict[F]['mz']) for x in expected_grid_mz_values[jj]])
                 khipu_grid.iloc[ii, jj] = F
+                self.annotation_dict[F] = (self.isotope_index[ii], self.adduct_index[jj])
 
         return khipu_grid
 
@@ -296,22 +320,14 @@ class khipu:
         isotope_index is fixed based on inital isotope_search_patterns.
         isotopic_edges not needed as we re-align nodes.
         Updates self.khipu_grid
-
-
-        nodes = set([])
-        for e in isotopic_edges:
-            nodes.add(e[0])
-            nodes.add(e[1])
-        
-        sorted_mz_peak_ids = sorted([(self.feature_dict[n]['mz'], n) for n in nodes])
-
         '''
         _d = realign_isotopes(self.sorted_mz_peak_ids, self.isotope_search_patterns)
         self.khipu_grid = pd.DataFrame.from_dict(
             _d, orient="index", columns=['A1'], dtype=str,
         )
+        for k,v in _d.items():
+            self.annotation_dict[v] = (k, 'A1')
         
-
     def build_trunk_only_grid(self, adduct_edges):
         '''When no isotopes, only trunk is needed to describe adducts.
         Updates self.khipu_grid
@@ -330,6 +346,8 @@ class khipu:
             {"M": indexed_adducts}, 
             orient="index", columns=self.adduct_index, dtype=str,
         )
+        for x in indexed_adducts:
+            self.annotation_dict[x] = ('M', dict_node_label.get(x, x))
 
     def build_grid_abstracted(self, abstracted_adduct_edges, root_branch):
         '''Compute grid structure and expected_grid_mz_values.
@@ -420,22 +438,38 @@ class khipu:
 
 
     def export_json(self):
+
+
+
+        return self.khipu_grid.to_json()
+
+
+    def export_json_grid_data(self):
         return self.khipu_grid.to_json()
 
 
     def format_to_epds(self, id=''):
         '''Format khipu to empirical compound, with added ion notions.
+        A small number of features do not map the khipu grid, 
+        usually because their edges violate DAG rules. 
+        They are kept in empCpd as "undetermined".
         '''
         if not id:
             id = 'root@' + self.root
         features = []
-        for a in self.khipu_grid.columns:
-            for m in self.khipu_grid.index:
-                if self.khipu_grid[m, a]:
-                    ion = self.feature_dict[self.khipu_grid[m, a]]
-                    ion['isotope'] = m
-                    ion['modification':] = a
-                    ion['ion_relation'] = ','.join([m, a])
+        for n in self.nodes_to_use:
+            try:
+                m, a = self.annotation_dict[n]
+                ion = self.feature_dict[n]
+                ion['isotope'] = m
+                ion['modification'] = a
+                ion['ion_relation'] = ','.join([m, a])
+            except KeyError:
+                # print("\nannotation_dict KeyError ", n, id)
+                # print(self.clean_network.edges(data=True))
+                # self.print()
+                ion = self.feature_dict[n]
+                ion['ion_relation'] = 'undetermined'
             features.append( ion )
 
         return {

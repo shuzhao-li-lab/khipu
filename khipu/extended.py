@@ -131,3 +131,59 @@ class khipu_diagnosis(khipu):
 
     def to_dataframe(self):
         pass
+
+
+# -----------------------------------------------------------------------------
+
+def peak_dict_to_khipu_list(subnetworks, peak_dict, isotope_search_patterns, adduct_search_patterns):
+    khipu_list = []
+    for g in subnetworks:
+        KP = khipu(g, isotope_search_patterns, adduct_search_patterns)
+        KP.build_khipu(peak_dict)
+        khipu_list.append(KP)
+        while KP.redundant_nodes and KP.pruned_network.edges():
+            KP = khipu(KP.pruned_network, isotope_search_patterns, adduct_search_patterns)
+            KP.build_khipu(peak_dict)
+            khipu_list.append(KP)
+
+    # assign IDs
+    ii = 0
+    for KP in khipu_list:
+        base_mz = int(peak_dict[KP.root]['mz']) - 1
+        ii += 1
+        KP.id = 'kp' + str(ii) + "_" + str(base_mz)
+
+    return khipu_list
+
+
+def extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended):
+    list_assigned_peaks = []
+    for KP in khipu_list:
+        list_assigned_peaks += KP.nodes_to_use
+
+    unassigned_peaks = [x for x in peak_dict if x not in list_assigned_peaks]
+    for KP in khipu_list:
+        KP.extended_search(unassigned_peaks, adduct_search_patterns_extended)
+
+
+    return khipu_list
+
+
+def export_json_khipu_list(khipu_list):
+    J = []
+    for KP in khipu_list:
+        J.append(KP.export_json())
+    return J
+
+
+def export_empCpd_khipu_list(khipu_list):
+    '''
+            except KeyError:
+            print(KP.id, KP.nodes_to_use, KP.clean_network.edges())
+    '''
+    J = []
+    for KP in khipu_list:
+        #try:
+        J.append(KP.format_to_epds(id=KP.id))
+
+    return J

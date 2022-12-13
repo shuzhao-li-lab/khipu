@@ -8,7 +8,7 @@ adduct_search_patterns = [ #(1.0078, 'H'),
                             #(18.0106, 'H2O'),
                             (17.02655, 'NH3'),
                             (35.9767, 'HCl'),
-                            (37.955882, 'K-H'),
+                            (37.955882, 'K/H'),
                             (46.00548, 'CO+H2O'),
                             ]
 
@@ -305,6 +305,7 @@ def realign_isotopes(sorted_mz_peak_ids, isotope_search_patterns, mz_tolerance=0
         match = get_isotope_pattern_name(p[0] - M0[0], isotope_search_patterns, mz_tolerance)
         if match == 'Unknown':
             _d["? " + p[1]] = p[1]
+            print(p)
         else:
             _d[match] = p[1]
 
@@ -343,7 +344,7 @@ def get_isotope_pattern_name(mz, isotope_search_patterns, mz_tolerance=0.01):
     '''
     L = sorted([(abs(mz-x[0]), x[1]) for x in isotope_search_patterns])
     if L[0][0] > mz_tolerance:
-        print("Warning no match: ", mz)
+        print("Warning no match in isotope_pattern: ", mz)
         return 'Unknown'
     else:
         return L[0][1]
@@ -414,4 +415,3 @@ def __mass_pair_mapping(list1, list2):
     Given the small size of matrices in khipu, np.argmin() is a better solution.
     '''
     pass
-
