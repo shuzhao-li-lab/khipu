@@ -6,14 +6,14 @@ To-Dos:
 
 - update adduct rules. Not allowing multiplication of adduct instances?? 
 - demo notebooks
-- extended adducts
-- automate full feature table annotation
+- move unaligned features to redundant
 - order trunk by m/z ??
 
 '''
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from .utils import *
 
@@ -454,10 +454,6 @@ class khipu:
         return abundance_matrix
 
 
-
-
-
-
     #---------- export and visual --------------
     def print_khipu(self):
         '''Print khipu using adducts as trunk and isotopes as branches (preferred)
@@ -469,14 +465,40 @@ class khipu:
         '''
         print(self.khipu_grid.T)
         
-
     def plot_khipu_diagram(self):
         '''Plot the khipu grid as diagram.
-        Use MatPlotLib as default engine?
+        Use MatPlotLib as default engine.
 
         '''
-        abundance_matrix = np.log2( self.get_khipu_intensities() + 1 )
-        abundance_matrix.plot()
+        df = self.get_khipu_intensities()
+        _M, _N = df.shape
+        zdata = []
+        for ii in range(_M):
+            for jj in range(_N):
+                zdata.append((jj, ii, df.iloc[ii, jj]))
+        
+        X = [d[0] for d in zdata]
+        Y = [d[1] for d in zdata]
+        S = [(np.log10(d[2]+1))**2 for d in zdata]
+        
+        fig, ax = plt.subplots()
+        
+        for jj in range(_N):
+            ax.text(jj, -1, df.columns[jj], rotation=60)
+            ax.plot([jj]*_M, range(_M), marker='o', linestyle='--', markersize=0.1)
+        
+        ax.plot([-1, _N+1], [0,0], linestyle='-', linewidth=2, color='k', alpha=0.3)
+        ax.scatter(X, Y, c='red', s=S, alpha=0.8)
+        
+        for ii in range(_M):
+            ax.text(_N+1.6, ii, df.index[ii])
+        
+        ax.margins(0.2)
+        ax.set_axis_off()
+        ax.invert_yaxis()
+        
+        #fig.tight_layout()
+        plt.show()
 
 
     def plot_khipu_diagram_rotated(self):
