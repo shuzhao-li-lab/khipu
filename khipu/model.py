@@ -33,6 +33,9 @@ class khipu:
             ('F3533', 'F20', {'type': 'modification', 'tag': 'Na/H'}), 
             ('F195', 'F20', {'type': 'modification', 'tag': 'Acetonitrile'}), 
             ('F20', 'F53', {'type': 'isotope', 'tag': '13C/12C'}), 
+        
+        self.is_13C_verified = False
+        self.is_singleton = False
         '''
         self.input_network = subnetwork
         self.isotope_search_patterns = isotope_search_patterns
@@ -49,8 +52,6 @@ class khipu:
                                             # M is explicitly specified during search
                                             # N is dynamically determined on each khipu
 
-        self.is_13C_verified = False
-        self.is_singleton = False
 
     def build_khipu(self, peak_dict, mz_tolerance_ppm=5, check_fitness=False):
         '''Convert a network of two types of edges, isotopic and adduct, to khipu instances of unique nodes.
@@ -63,16 +64,7 @@ class khipu:
         Updates
         -------
         self.khipu_grid : pd.DataFrame
-        
-
-            # clean() may cut some edges
-            new_nodes = self.clean_network.nodes()
-            for n in self.nodes_to_use:
-                if n not in new_nodes:
-                    self.redundant_nodes.append(n)
-            self.nodes_to_use = new_nodes
-
-
+        self.pruned_network : extra features and edges that are not fit in this khipu
         '''
         self.feature_dict, self.mzstr_dict = self.get_feature_dict(peak_dict, mz_tolerance_ppm)
         if self.input_network.number_of_edges() == 1:
@@ -81,8 +73,6 @@ class khipu:
         else:
             self.clean()
             self.clean_network = self.input_network.subgraph(self.nodes_to_use)
-
-
             isotopic_edges, adduct_edges = [], []
             for e in self.clean_network.edges(data=True):
                 if e[2]['type'] == 'isotope':
@@ -102,7 +92,6 @@ class khipu:
 
         if self.redundant_nodes:
             self.pruned_network = self.input_network.subgraph(self.redundant_nodes)
-
 
     def build_simple_pair_grid(self, peak_dict):
         '''A khipu of only two nodes (one edge) does not need to go through full grid process,
@@ -127,10 +116,13 @@ class khipu:
 
     def clean(self):
         '''Clean up the input subnetwork, only using unique features to build a khipu frame.
-        Redundant features are kept aside. 
-        The leftover features are sent off to build new khipus.
+        Redundant features are kept aside. The leftover features will be sent off to build new khipus.
+
+        Notes
+        -----
         Note: mzstr_dict can be problematic in data that were not processed well, 
         because minor potential shift can confuse ion relations.
+        This clean() may cut some initial edges.
         '''
         self.median_rtime = np.median([self.feature_dict[n]['rtime'] for n in self.input_network])
         for k,v in self.mzstr_dict.items():
@@ -147,7 +139,6 @@ class khipu:
         self.sorted_mz_peak_ids = self.sort_nodes_by_mz()
         self.root = self.sorted_mz_peak_ids[0][1]
 
-
     def get_feature_dict(self, peak_dict, mz_tolerance_ppm):
         '''Index all input features; establish str identifier for features of same/close m/z values.
         Base on asari mass track IDs; keep unique m/z only.
@@ -156,7 +147,7 @@ class khipu:
         Parameters
         ----------
         peak_dict : dict of peaks/features indexed by IDs. Must have fields 
-                    'id', 'mz', 'rtime', 'representative_intensity'
+                    'id', 'mz', 'rtime', 'representative_intensity'.
         mz_tolerance_ppm : ppm tolerance in examining m/z groups.
 
         Returns
@@ -179,13 +170,11 @@ class khipu:
 
         return feature_dict, mzstr_dict
 
-
     def sort_nodes_by_mz(self):
         '''sort the nodes by increasing m/z
         '''
         return sorted( [(self.feature_dict[n]['mz'], n) for n in self.nodes_to_use ])
         
-
     def build_full_grid(self, isotopic_edges, adduct_edges):
         '''Build a khipu grid, after the input network is cleaned to isotopic_edges and adduct_edges.
         1) Get isotopic branches first, and treat them each branch as a node. This converts (U, V) to (U, B)
@@ -267,7 +256,6 @@ class khipu:
 
         return abstracted_adduct_edges, root_branch, branch_dict
 
-
     def snap_features_to_grid(self, branch_dict, expected_grid_mz_values):
         '''Create khipu_grid. To snap each feature to the expected_grid_mz_values.
 
@@ -310,10 +298,9 @@ class khipu:
             for F in isotopes:
                 ii = np.argmin([abs(x-self.feature_dict[F]['mz']) for x in expected_grid_mz_values[jj]])
                 khipu_grid.iloc[ii, jj] = F
-                self.annotation_dict[F] = (self.isotope_index[ii], self.adduct_index[jj])
+                self.annotation_dict[F] = (self.isotope_index[ii], self.adduct_index_labels[jj])
 
         return khipu_grid
-
 
     def build_branch_only_grid(self):
         '''When there's only a single adduct, this builds a branch for 'A1'.
@@ -399,16 +386,58 @@ class khipu:
 
         return indexed_adducts, adduct_index_labels, expected_grid_mz_values
 
-    def print_khipu(self):
-        '''Print khipu using adducts as trunk and isotopes as branches (preferred)
+
+
+    def extended_search(self, mztree, adduct_search_patterns_extended, mz_tolerance_ppm=5, rt_tolerance=2):
+        '''Find additional adducts from unassigned_peaks using adduct_search_patterns_extended.
+        mztree here are indexed unassigned_peaks.
+
+        Updates
+        -------
+        self.annotation_dict
+        self.khipu_grid
+
+        Returns
+        -------
+        added_peaks
+
+        Notes
+        -----
+        annotation_dict may have fewer nodes than nodes_to_use, but is preferred here for cleaner results.
         '''
-        print(self.khipu_grid)
-        
-    def print_khipu_rotated(self):
-        '''Print khipu using isotopes as trunk and adducts as branches
-        '''
-        print(self.khipu_grid.T)
-        
+        matched, _new_anno_dict, _grid_dict = [], {}, {}
+        for n, v in self.annotation_dict.items():
+            _iso, _ad = v
+            P1 = self.feature_dict[n]
+            for _pair in adduct_search_patterns_extended:
+                (mass_difference, relation) = _pair[:2]
+                _match = []
+                tmp = find_all_matches_centurion_indexed_list(P1['mz'] + mass_difference, 
+                                mztree, mz_tolerance_ppm)
+                for P2 in tmp:
+                    delta_rtime = abs(P1['rtime']-P2['rtime'])
+                    if delta_rtime <= rt_tolerance:
+                        _match.append((delta_rtime, P2))
+                if _match:      # get best match by rtime only 
+                    e1 = sorted(_match)[0][1]['id']
+                    matched.append( (n, e1, relation) )
+                    # P2 = P1 + adduct_relation. ',' avoids overwriting of existing names in khipu_grid
+                    _new_anno_dict[e1] = (_iso, _ad + ',' + relation)
+
+        _new_adduct_index = list(set([x[1] for x in _new_anno_dict.values()]))
+        _new_df = pd.DataFrame( np.empty((len(self.isotope_index), len(_new_adduct_index)), dtype=np.str),
+                            index=self.isotope_index,
+                            columns=_new_adduct_index,
+                            dtype=str)
+        for k,v in _new_anno_dict.items():
+            _new_df.loc[v[0], v[1]] = k
+
+        self.khipu_grid = pd.concat([self.khipu_grid, _new_df], axis=1)
+        self.annotation_dict.update(_new_anno_dict)
+
+        return [x[1] for x in matched]
+
+
     def get_khipu_intensities(self):
         '''Return abundance_matrix as DataFrame in same layout as self.khipu_grid
         '''
@@ -423,6 +452,23 @@ class khipu:
                     abundance_matrix.iloc[ii, jj] = self.feature_dict[self.khipu_grid.iloc[ii,jj]
                                                                 ]['representative_intensity']
         return abundance_matrix
+
+
+
+
+
+
+    #---------- export and visual --------------
+    def print_khipu(self):
+        '''Print khipu using adducts as trunk and isotopes as branches (preferred)
+        '''
+        print(self.khipu_grid)
+        
+    def print_khipu_rotated(self):
+        '''Print khipu using isotopes as trunk and adducts as branches
+        '''
+        print(self.khipu_grid.T)
+        
 
     def plot_khipu_diagram(self):
         '''Plot the khipu grid as diagram.
@@ -440,7 +486,6 @@ class khipu:
     def export_json(self):
 
 
-
         return self.khipu_grid.to_json()
 
 
@@ -450,8 +495,7 @@ class khipu:
 
     def format_to_epds(self, id=''):
         '''Format khipu to empirical compound, with added ion notions.
-        A small number of features do not map the khipu grid, 
-        usually because their edges violate DAG rules. 
+        A small number of features do not map the khipu grid, usually because their edges violate DAG rules. 
         They are kept in empCpd as "undetermined".
         '''
         if not id:

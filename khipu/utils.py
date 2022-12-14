@@ -2,14 +2,11 @@ import json
 import networkx as nx
 from mass2chem.search import build_centurion_tree, find_all_matches_centurion_indexed_list
 
-adduct_search_patterns = [ #(1.0078, 'H'), 
-                            (21.9820, 'Na/H'), 
+adduct_search_patterns = [  (21.9820, 'Na/H'), 
                             (41.026549, 'Acetonitrile'),
-                            #(18.0106, 'H2O'),
                             (17.02655, 'NH3'),
                             (35.9767, 'HCl'),
                             (37.955882, 'K/H'),
-                            (46.00548, 'CO+H2O'),
                             ]
 
 adduct_search_patterns_neg = [ (34.969402, 'Cl-'), 
@@ -18,6 +15,7 @@ adduct_search_patterns_neg = [ (34.969402, 'Cl-'),
                             (21.9820, 'Na/H'), 
                             (41.026549, 'Acetonitrile'),
                             (35.9767, 'HCl'),
+                            (37.955882, 'K/H'),
                             ]
 
 isotope_search_patterns = [ (1.003355, '13C/12C', (0, 0.8)),
@@ -33,6 +31,22 @@ isotope_search_patterns = [ (1.003355, '13C/12C', (0, 0.8)),
                             (11.036905, '13C/12C*11', (0, 0.8)),
                             (12.04026, '13C/12C*12', (0, 0.8)),
                             ]
+
+extended_adducts = [(1.0078, 'H'),
+                            (10.991, 'Na/H, double charged'),
+                            (0.5017, '13C/12C, double charged'),
+                            (18.0106, 'H2O'),      # easy to confuse with bio reactions
+                            (18.033823, 'M+NH4'),
+                            (27.01089904, 'HCN'),
+                            (37.94694, 'Ca/H2'),
+                            (32.026215, 'MeOH'),
+                            (43.96389, 'Na2/H2'),
+                            (46.00548, 'HCOOH'),
+                            (67.987424, 'NaCOOH'),
+                            (83.961361, 'KCOOH'),
+                            (97.96737927, 'H2SO4'),
+                            (97.97689507, 'H3PO4'),
+]
 
 
 def make_peak_tag(peak):

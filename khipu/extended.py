@@ -2,7 +2,7 @@ import treelib
 from .model import *
 
 class khipu_diagnosis(khipu):
-    '''Added diagnostic functions to khipu class.
+    '''Added diagnostic and exploratory functions to khipu class.
     They should be run after khipu.build_khipu().
     '''
     def show_trimming(self):
@@ -126,12 +126,6 @@ class khipu_diagnosis(khipu):
             khipu_grid.iloc[np.unravel_index(ii, expected.shape)] = x[1]
         return khipu_grid
 
-    def plot(self):
-        pass
-
-    def to_dataframe(self):
-        pass
-
 
 # -----------------------------------------------------------------------------
 
@@ -156,17 +150,21 @@ def peak_dict_to_khipu_list(subnetworks, peak_dict, isotope_search_patterns, add
     return khipu_list
 
 
-def extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended):
+def extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended, mz_tolerance_ppm=5, rt_tolerance=2):
+    '''Update khipus by extended adduct search.
+    Returns updated khipu_list and list_assigned_peaks.
+    '''
     list_assigned_peaks = []
     for KP in khipu_list:
         list_assigned_peaks += KP.nodes_to_use
-
-    unassigned_peaks = [x for x in peak_dict if x not in list_assigned_peaks]
+    unassigned_peaks = [v for x,v in peak_dict.items() if x not in list_assigned_peaks]
+    mztree = build_centurion_tree(unassigned_peaks)
     for KP in khipu_list:
-        KP.extended_search(unassigned_peaks, adduct_search_patterns_extended)
+        added_peaks = KP.extended_search(mztree, 
+                            adduct_search_patterns_extended,  mz_tolerance_ppm, rt_tolerance)
+        list_assigned_peaks += added_peaks
 
-
-    return khipu_list
+    return khipu_list, list_assigned_peaks
 
 
 def export_json_khipu_list(khipu_list):
@@ -177,13 +175,12 @@ def export_json_khipu_list(khipu_list):
 
 
 def export_empCpd_khipu_list(khipu_list):
-    '''
-            except KeyError:
-            print(KP.id, KP.nodes_to_use, KP.clean_network.edges())
+    '''Export all khipus in khipu_list to a list of empirical compounds, which is JSON compatible.
+    Wrapper of khipu.format_to_epds().
+    A small number of features are kept in empCpd as "undetermined". 
+    They came due to initial edges but violate DAG rules. 
     '''
     J = []
     for KP in khipu_list:
-        #try:
         J.append(KP.format_to_epds(id=KP.id))
-
     return J

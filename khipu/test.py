@@ -27,6 +27,7 @@ def test_read_url(url='https://github.com/shuzhao-li/khipu/raw/main/testdata/ful
     subnetworks, peak_dict, edge_dict = peaks_to_networks(flist,
                         adduct_search_patterns = adduct_search_patterns,
                         isotope_search_patterns = isotope_search_patterns,
+                        rt_tolerance = 1,       # 1 sec
     )
     return subnetworks, peak_dict, edge_dict
 
@@ -103,6 +104,12 @@ if __name__ == '__main__':
     print("\n\n")
     KP.build_khipu_tree()
 
+    unassigned_peaks = [v for x,v in peak_dict.items() if x not in KP.nodes_to_use]
+    mztree =  build_centurion_tree(unassigned_peaks)
+    KP.extended_search(mztree, extended_adducts)
+    print("extended khipu with additional adducts: ")
+    KP.print()
+
     # KP.plot_khipu_diagram()
 
     print("\n\n")
@@ -115,10 +122,9 @@ if __name__ == '__main__':
         KP.print_khipu()
         print('\n\n')
 
-
     print("\n\n")
-    print("Build and export full list of khipus: ")
-    print("======================== \n")
+    print("Build and export JSON file of full list of khipus: ")
+    print("================================================== \n")
 
     khipu_list = peak_dict_to_khipu_list(
         subnetworks, peak_dict, isotope_search_patterns, adduct_search_patterns)
@@ -130,4 +136,3 @@ if __name__ == '__main__':
     outfile = 'khipu_test_empricalCompounds.json'
     with open(outfile, 'w', encoding='utf-8') as f:
         json.dump(empCpds, f, ensure_ascii=False, indent=2)
-
