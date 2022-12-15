@@ -1,11 +1,7 @@
-'''
-Placeholder
-
-'''
-
 import argparse
 from khipu import __version__
-from .utils import khipu_annotate
+from .extended import *
+
 
 def main():
     '''
@@ -21,14 +17,11 @@ def main():
     parser.add_argument('--ppm', default=5, type=int, 
             help='mass precision in ppm (part per million), same as mz_tolerance_ppm')
     parser.add_argument('-i', '--input', 
-            help='input directory of mzML files to process, or a single file to analyze')
+            help='input file as feature table')
     parser.add_argument('-o', '--output', 
-            help='output directory')
-    parser.add_argument('-j', '--project', 
-            help='project name')
+            help='prefix of output files')
 
     args = parser.parse_args()
-
     khipu_annotate(args)
 
 
@@ -38,3 +31,4 @@ def main():
 if __name__ == '__main__':
     
     main()
+    

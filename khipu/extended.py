@@ -1,5 +1,6 @@
 import treelib
 from .model import *
+from mass2chem.io import read_features
 
 class khipu_diagnosis(khipu):
     '''Added diagnostic and exploratory functions to khipu class.
@@ -129,17 +130,66 @@ class khipu_diagnosis(khipu):
 
 # -----------------------------------------------------------------------------
 
+def test_read_file(infile, 
+                    isotope_search_patterns,
+                    adduct_search_patterns,
+                    mz_tolerance_ppm,
+                    rt_tolerance, ):
+    '''The input feature table must be a tab delimited file, with the first four columns as:
+    ID, m/z, retention_time, intensity.
+    Example data at '../testdata/full_Feature_table.tsv'.
+    '''
+    flist = read_features_from_text(open(infile).read(),
+                    id_col=0, mz_col=1, rtime_col=2, intensity_cols=(3,4), delimiter="\t"
+    )
+    subnetworks, peak_dict, edge_dict = peaks_to_networks(flist,
+                    isotope_search_patterns,
+                    adduct_search_patterns,
+                    mz_tolerance_ppm,
+                    rt_tolerance
+    )
+    return subnetworks, peak_dict, edge_dict
+
+
+def khipu_annotate(args):
+    '''args as from parser.parse_args()
+
+
+
+    '''
+    subnetworks, peak_dict, edge_dict = test_read_file(f=args.input)
+    khipu_list = peak_dict_to_khipu_list(
+        subnetworks, peak_dict, isotope_search_patterns, adduct_search_patterns)
+    
+    # khipu_list = extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended)
+    print("\n\n ~~~~~~ Got %d khipus ~~~~~~~ \n\n" %len(khipu_list))
+    empCpds = export_empCpd_khipu_list(khipu_list)
+
+    outfile = 'khipu_test_empricalCompounds.json'
+    if args.output:
+        outfile = args.output
+    with open(outfile, 'w', encoding='utf-8') as f:
+        json.dump(empCpds, f, ensure_ascii=False, indent=2)
+
+
 def peak_dict_to_khipu_list(subnetworks, peak_dict, isotope_search_patterns, adduct_search_patterns):
+    '''Generate full khipu_list from subnetworks, 
+    including iterative khipus based on features pruned out of initial subnetwork.
+    '''
     khipu_list = []
     for g in subnetworks:
         KP = khipu(g, isotope_search_patterns, adduct_search_patterns)
         KP.build_khipu(peak_dict)
         khipu_list.append(KP)
         while KP.redundant_nodes and KP.pruned_network.edges():
-            KP = khipu(KP.pruned_network, isotope_search_patterns, adduct_search_patterns)
-            KP.build_khipu(peak_dict)
-            khipu_list.append(KP)
-
+            # make sure pruned_network is connected
+            more_subnets = [KP.pruned_network.subgraph(c).copy() 
+                                    for c in nx.connected_components(KP.pruned_network)]
+            for _G in more_subnets:
+                KP = khipu(_G, isotope_search_patterns, adduct_search_patterns)
+                KP.build_khipu(peak_dict)
+                khipu_list.append(KP)
+    
     # assign IDs
     ii = 0
     for KP in khipu_list:
@@ -177,8 +227,8 @@ def export_json_khipu_list(khipu_list):
 def export_empCpd_khipu_list(khipu_list):
     '''Export all khipus in khipu_list to a list of empirical compounds, which is JSON compatible.
     Wrapper of khipu.format_to_epds().
-    A small number of features are kept in empCpd as "undetermined". 
-    They came due to initial edges but violate DAG rules. 
+    A small number of features are "undetermined", as they came due to initial edges but violate DAG rules. 
+    They are sent off for a new khipu.
     '''
     J = []
     for KP in khipu_list:

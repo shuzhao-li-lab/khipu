@@ -4,16 +4,17 @@ Each khipu = empCpd["MS1_pseudo_Spectra"].
 
 To-Dos:
 
-- update adduct rules. Not allowing multiplication of adduct instances?? 
-- demo notebooks
-- move unaligned features to redundant
-- order trunk by m/z ??
+- cli function
 
 '''
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+
+try:
+    import matplotlib.pyplot as plt
+except:
+    print("  matplotlib ImportError.")
 
 from .utils import *
 
@@ -267,7 +268,8 @@ class khipu:
 
         Updates
         -------
-        self.annotation_dict : the isotope and adduct notions for each feature
+        self.annotation_dict : the isotope and adduct notions for each feature.
+        self.redundant_nodes : features that do not fit DAG are sent to redundant_nodes.
 
         Returns
         -------
@@ -299,6 +301,10 @@ class khipu:
                 ii = np.argmin([abs(x-self.feature_dict[F]['mz']) for x in expected_grid_mz_values[jj]])
                 khipu_grid.iloc[ii, jj] = F
                 self.annotation_dict[F] = (self.isotope_index[ii], self.adduct_index_labels[jj])
+        
+        for n in self.nodes_to_use:
+            if n not in self.annotation_dict:
+                self.redundant_nodes.append(n)
 
         return khipu_grid
 
@@ -324,7 +330,7 @@ class khipu:
         for e in adduct_edges:
             if self.feature_dict[e[0]]['mz'] > self.feature_dict[e[1]]['mz']:
                 e = (e[1], e[0], e[2])
-            dict_node_label[e[1]] = '(' + e[0] + '+' + e[2]['tag'] + ')'    # e[1] + 
+            dict_node_label[e[1]] = '(' + e[0] + '+' + e[2]['tag'] + ')'
 
         DG = nx.DiGraph(adduct_edges)
         indexed_adducts = list(nx.topological_sort(DG))     # ordered node IDs
@@ -365,7 +371,7 @@ class khipu:
         for e in abstracted_adduct_edges:
             mz_modification_dict[make_edge_tag((e[0], e[1]))] = adduct_mz_dict[e[2]['tag']]
             # e[1] + 
-            dict_node_label[e[1]] = '(' + e[0] + '+' + e[2]['tag'] + ')'
+            dict_node_label[e[1]] = e[0] + '+' + e[2]['tag']
 
         DG = nx.DiGraph(abstracted_adduct_edges)
         # walk the graph through all nodes, and build trunk in that order
@@ -385,8 +391,6 @@ class khipu:
             ) 
 
         return indexed_adducts, adduct_index_labels, expected_grid_mz_values
-
-
 
     def extended_search(self, mztree, adduct_search_patterns_extended, mz_tolerance_ppm=5, rt_tolerance=2):
         '''Find additional adducts from unassigned_peaks using adduct_search_patterns_extended.
@@ -437,7 +441,6 @@ class khipu:
 
         return [x[1] for x in matched]
 
-
     def get_khipu_intensities(self):
         '''Return abundance_matrix as DataFrame in same layout as self.khipu_grid
         '''
@@ -468,7 +471,6 @@ class khipu:
     def plot_khipu_diagram(self):
         '''Plot the khipu grid as diagram.
         Use MatPlotLib as default engine.
-
         '''
         df = self.get_khipu_intensities()
         _M, _N = df.shape
@@ -484,7 +486,8 @@ class khipu:
         fig, ax = plt.subplots()
         
         for jj in range(_N):
-            ax.text(jj, -1, df.columns[jj], rotation=60)
+            _t = str(int(df.iloc[0, jj])) + ' ~ ' + df.columns[jj]
+            ax.text(jj, -1, _t, rotation=60)
             ax.plot([jj]*_M, range(_M), marker='o', linestyle='--', markersize=0.1)
         
         ax.plot([-1, _N+1], [0,0], linestyle='-', linewidth=2, color='k', alpha=0.3)
@@ -506,8 +509,8 @@ class khipu:
 
 
     def export_json(self):
-
-
+        '''Placeholder.
+        '''
         return self.khipu_grid.to_json()
 
 
@@ -517,7 +520,7 @@ class khipu:
 
     def format_to_epds(self, id=''):
         '''Format khipu to empirical compound, with added ion notions.
-        A small number of features do not map the khipu grid, usually because their edges violate DAG rules. 
+        A small number of features do not map the khipu grid (e.g. their edges violate DAG rules). 
         They are kept in empCpd as "undetermined".
         '''
         if not id:

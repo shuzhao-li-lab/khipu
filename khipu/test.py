@@ -5,20 +5,10 @@ To run test from top directory:
 import urllib.request
 import numpy as np
 
-from mass2chem.io import read_features
-
-# from .json_encoder import NpEncoder
 from .model import khipu
 from .extended import *
 from .utils import *
 
-
-def test_read_file(f='../testdata/full_Feature_table.tsv'):
-    '''Use from mass2chem.io import read_features
-    '''
-    flist = read_features(f, id_col=0, mz_col=1, rtime_col=2, intensity_cols=(11, 17))
-    subnetworks, peak_dict, edge_dict = peaks_to_networks(flist)
-    return subnetworks, peak_dict, edge_dict
 
 def test_read_url(url='https://github.com/shuzhao-li/khipu/raw/main/testdata/full_Feature_table.tsv'):
     print("Retrieving test data from GitHub.")
@@ -30,50 +20,6 @@ def test_read_url(url='https://github.com/shuzhao-li/khipu/raw/main/testdata/ful
                         rt_tolerance = 1,       # 1 sec
     )
     return subnetworks, peak_dict, edge_dict
-
-def read_features_from_text(text_table, 
-                        id_col=0, mz_col=1, rtime_col=2, 
-                        intensity_cols=(3,4), delimiter="\t"):
-    '''
-    Read a text feature table into a list of features.
-    Input
-    -----
-    text_table: Tab delimited feature table read as text. First line as header.
-                    Recommended col 0 for ID, col 1 for m/z, col 2 for rtime.
-    id_col: column for id. If feature ID is not given, row_number is used as ID.
-    mz_col: column for m/z.
-    rtime_col: column for retention time.
-    intensity_cols: range of columns for intensity values. E.g. (3,5) includes only col 3 and 4.
-    Return
-    ------
-    List of features: [{'id': '', 'mz': 0, 'rtime': 0, 
-                        intensities: [], 'representative_intensity': 0, ...}, 
-                        ...], 
-                        where representative_intensity is mean value.
-    '''
-    # featureLines = open(feature_table).read().splitlines()
-    featureLines = text_table.splitlines()
-    header = featureLines[0].split(delimiter)
-    num_features = len(featureLines)-1
-    # sanity check
-    print("table headers ordered: ", header[mz_col], header[rtime_col])
-    print("Read %d feature lines" %num_features)
-    L = []
-    for ii in range(1, num_features+1):
-        if featureLines[ii].strip():
-            a = featureLines[ii].split(delimiter)
-            if isinstance(id_col, int):         # feature id specified
-                iid = a[id_col]
-            else:
-                iid = 'row'+str(ii)
-            xstart, xend = intensity_cols
-            intensities = [float(x) for x in a[xstart: xend]]
-            L.append({
-                'id': iid, 'mz': float(a[mz_col]), 'rtime': float(a[rtime_col]),
-                'intensities': intensities,
-                'representative_intensity': np.mean(intensities),
-            })
-    return L
 
 
 #
