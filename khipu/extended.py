@@ -1,6 +1,6 @@
 import treelib
 from .model import *
-from mass2chem.io import read_features
+from .utils import isotope_search_patterns, adduct_search_patterns
 
 class khipu_diagnosis(khipu):
     '''Added diagnostic and exploratory functions to khipu class.
@@ -131,10 +131,10 @@ class khipu_diagnosis(khipu):
 # -----------------------------------------------------------------------------
 
 def test_read_file(infile, 
-                    isotope_search_patterns,
-                    adduct_search_patterns,
-                    mz_tolerance_ppm,
-                    rt_tolerance, ):
+                    isotope_search_patterns=isotope_search_patterns, 
+                    adduct_search_patterns=adduct_search_patterns,
+                    mz_tolerance_ppm=5,
+                    rt_tolerance=2, ):
     '''The input feature table must be a tab delimited file, with the first four columns as:
     ID, m/z, retention_time, intensity.
     Example data at '../testdata/full_Feature_table.tsv'.
@@ -157,9 +157,13 @@ def khipu_annotate(args):
 
 
     '''
-    subnetworks, peak_dict, edge_dict = test_read_file(f=args.input)
+    subnetworks, peak_dict, edge_dict = test_read_file(infile=args.input,
+    
+    )
     khipu_list = peak_dict_to_khipu_list(
-        subnetworks, peak_dict, isotope_search_patterns, adduct_search_patterns)
+        subnetworks, peak_dict, isotope_search_patterns, adduct_search_patterns
+        
+        )
     
     # khipu_list = extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended)
     print("\n\n ~~~~~~ Got %d khipus ~~~~~~~ \n\n" %len(khipu_list))

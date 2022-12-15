@@ -3,6 +3,7 @@ Utility functions and m/z patterns.
 Adduct rules can be still better learned in the future.
 '''
 import json
+import numpy as np
 import networkx as nx
 from mass2chem.search import build_centurion_tree, find_all_matches_centurion_indexed_list
 

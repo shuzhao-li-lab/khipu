@@ -4,7 +4,8 @@ Each khipu = empCpd["MS1_pseudo_Spectra"].
 
 To-Dos:
 
-- cli function
+- cli function, pos/neg
+- automate ext search
 
 '''
 
