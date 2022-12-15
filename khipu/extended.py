@@ -1,6 +1,6 @@
 import treelib
 from .model import *
-from .utils import isotope_search_patterns, adduct_search_patterns
+# from .utils import isotope_search_patterns, adduct_search_patterns, 
 
 class khipu_diagnosis(khipu):
     '''Added diagnostic and exploratory functions to khipu class.
@@ -154,19 +154,24 @@ def test_read_file(infile,
 def khipu_annotate(args):
     '''args as from parser.parse_args()
 
-
-
     '''
+    adduct_patterns = adduct_search_patterns
+    if args.mode == 'neg':
+        adduct_patterns = adduct_search_patterns_neg
     subnetworks, peak_dict, edge_dict = test_read_file(infile=args.input,
-    
+                    isotope_search_patterns=isotope_search_patterns, 
+                    adduct_search_patterns=adduct_patterns,
+                    mz_tolerance_ppm=args.ppm,
+                    rt_tolerance=args.rtol,
     )
-    khipu_list = peak_dict_to_khipu_list(
-        subnetworks, peak_dict, isotope_search_patterns, adduct_search_patterns
-        
-        )
     
-    # khipu_list = extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended)
-    print("\n\n ~~~~~~ Got %d khipus ~~~~~~~ \n\n" %len(khipu_list))
+    khipu_list = peak_dict_to_khipu_list(
+        subnetworks, peak_dict, isotope_search_patterns, adduct_patterns
+        )
+    khipu_list, all_assigned_peaks = extend_khipu_list(khipu_list, peak_dict, extended_adducts)
+
+    print("\n\n ~~~~~~ Got %d khipus, with %d features ~~~~~~~ \n\n" 
+                %(len(khipu_list), len(all_assigned_peaks)))
     empCpds = export_empCpd_khipu_list(khipu_list)
 
     outfile = 'khipu_test_empricalCompounds.json'
@@ -218,7 +223,7 @@ def extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended, mz
                             adduct_search_patterns_extended,  mz_tolerance_ppm, rt_tolerance)
         list_assigned_peaks += added_peaks
 
-    return khipu_list, list_assigned_peaks
+    return khipu_list, set(list_assigned_peaks)
 
 
 def export_json_khipu_list(khipu_list):

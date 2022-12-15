@@ -1,6 +1,18 @@
 # khipu as a tree data structure to model a chemical compound in mass spectrometry data
 This applies to regular LC-MS data, but also enables easy analysis of isotope tracing and chemical labeling data.
 
+## Use
+
+Best used as a library for software development or in a JupyterNotebook for data analysis. 
+Example notebooks:
+    notebooks/
+
+Install as a package:
+    pip install khipu-metabolomics
+
+Run from source code:
+    python3 -m khipu.main -i testdata/full_Feature_table.tsv -o this_test
+
 ## Why tree?
 Grouping ions in mass spectrometry data to their origin compound is a key step of data annotation.
 It's a common practice to search the data for signatures of mass differences, 
