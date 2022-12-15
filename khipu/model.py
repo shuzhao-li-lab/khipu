@@ -491,7 +491,10 @@ class khipu:
         fig, ax = plt.subplots()
         
         for jj in range(_N):
-            _t = str(int(df.iloc[0, jj])) + ' ~ ' + df.columns[jj]
+            # get min m/z per khipu_grid columa
+            _features = [f for f in  self.khipu_grid.iloc[:, jj] if f]
+            _mzs = [self.feature_dict[f]['mz'] for f in _features]
+            _t = str(int(min(_mzs))) + ' ~ ' + df.columns[jj]
             ax.text(jj, -1, _t, rotation=60)
             ax.plot([jj]*_M, range(_M), marker='o', linestyle='--', markersize=0.1)
         
