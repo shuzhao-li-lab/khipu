@@ -401,6 +401,7 @@ class khipu:
         -------
         self.annotation_dict
         self.khipu_grid
+        self.adduct_index_labels
 
         Returns
         -------
@@ -424,10 +425,12 @@ class khipu:
                     if delta_rtime <= rt_tolerance:
                         _match.append((delta_rtime, P2))
                 if _match:      # get best match by rtime only 
-                    e1 = sorted(_match)[0][1]['id']
+                    best_match_peak = sorted(_match)[0][1]
+                    e1 = best_match_peak['id']
                     matched.append( (n, e1, relation) )
                     # P2 = P1 + adduct_relation. ',' avoids overwriting of existing names in khipu_grid
                     _new_anno_dict[e1] = (_iso, _ad + ',' + relation)
+                    self.feature_dict[e1] = best_match_peak
 
         _new_adduct_index = list(set([x[1] for x in _new_anno_dict.values()]))
         _new_df = pd.DataFrame( np.empty((len(self.isotope_index), len(_new_adduct_index)), dtype=np.str),
@@ -439,6 +442,7 @@ class khipu:
 
         self.khipu_grid = pd.concat([self.khipu_grid, _new_df], axis=1)
         self.annotation_dict.update(_new_anno_dict)
+        self.adduct_index_labels = list(self.khipu_grid.columns)
 
         return [x[1] for x in matched]
 

@@ -56,6 +56,8 @@ if __name__ == '__main__':
     print("extended khipu with additional adducts: ")
     KP.print()
 
+    print("Feature intensities: ")
+    print(KP.get_khipu_intensities())
     # KP.plot_khipu_diagram()
 
     print("\n\n")
