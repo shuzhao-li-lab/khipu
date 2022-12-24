@@ -1,8 +1,7 @@
-import treelib
 from .model import *
 # from .utils import isotope_search_patterns, adduct_search_patterns, 
 
-class khipu_diagnosis(khipu):
+class khipu_diagnosis(Khipu):
     '''Added diagnostic and exploratory functions to khipu class.
     They should be run after khipu.build_khipu().
     '''
@@ -184,10 +183,13 @@ def khipu_annotate(args):
 def peak_dict_to_khipu_list(subnetworks, peak_dict, isotope_search_patterns, adduct_search_patterns):
     '''Generate full khipu_list from subnetworks, 
     including iterative khipus based on features pruned out of initial subnetwork.
+
+
     '''
     khipu_list = []
     for g in subnetworks:
-        KP = khipu(g, isotope_search_patterns, adduct_search_patterns)
+        # if g.size() < 50:
+        KP = Khipu(g, isotope_search_patterns, adduct_search_patterns)
         KP.build_khipu(peak_dict)
         khipu_list.append(KP)
         while KP.redundant_nodes and KP.pruned_network.edges():
@@ -195,10 +197,10 @@ def peak_dict_to_khipu_list(subnetworks, peak_dict, isotope_search_patterns, add
             more_subnets = [KP.pruned_network.subgraph(c).copy() 
                                     for c in nx.connected_components(KP.pruned_network)]
             for _G in more_subnets:
-                KP = khipu(_G, isotope_search_patterns, adduct_search_patterns)
+                KP = Khipu(_G, isotope_search_patterns, adduct_search_patterns)
                 KP.build_khipu(peak_dict)
                 khipu_list.append(KP)
-    
+
     # assign IDs
     ii = 0
     for KP in khipu_list:

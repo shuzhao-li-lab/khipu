@@ -29,12 +29,19 @@ if __name__ == '__main__':
     subnetworks, peak_dict, edge_dict = test_read_url()
     big = [g for g in subnetworks if g.size()>15]
 
+    WV = Weavor(isotope_search_patterns, adduct_search_patterns, 'pos')
+
+
     print("\n\n")
     print("Example khipu of one empirical compound from demo data.")
     KP = khipu_diagnosis(big[ 1 ], isotope_search_patterns, adduct_search_patterns)
     print("Input network edges: ")
     print(KP.input_network.edges(data=True))
-    KP.build_khipu(peak_dict)
+
+
+    KP.build_khipu(WV, peak_dict)
+
+
     print(KP.sorted_mz_peak_ids, "\n")
     KP.show_trimming()
     print("\n\n")

@@ -1,33 +1,311 @@
 '''
 Comprehensive construction of empCpds via generic tree structures (khipu).
 Each khipu = empCpd["MS1_pseudo_Spectra"].
-
-To-Dos:
-
-- cli function, pos/neg
-- automate ext search
-
+This module contains two classes:
+Weavor is constructed once and provides the main algorithms and functions;
+Khipu is mainlty the data structures and built as one instance per emprical compound.
+So from one experiment/feature table, one may get 10**3 khipus.
 '''
 
 import numpy as np
 import pandas as pd
+import treelib
+from scipy.optimize import curve_fit
+from .utils import *
 
 try:
     import matplotlib.pyplot as plt
 except:
     print("  matplotlib ImportError.")
 
-from .utils import *
+class Weavor:
+    '''For each experiment, this class sets up a grid of isotopes and adducts,
+    and provide function solve to produce matched features and inferred neutral mass.
+    '''
+    def __init__(self, peak_dict, 
+                isotope_search_patterns, adduct_search_patterns, 
+                mz_tolerance_ppm=5, mode='pos'):
+        '''Initiate mzgrid and indices.        
+        '''
+        self.mode = mode
+        self.mz_tolerance_ppm = mz_tolerance_ppm
+        self.peak_dict = peak_dict
+        self.isotope_search_patterns  = sorted(isotope_search_patterns)   # m/z sort search patterns
+        self.adduct_search_patterns = sorted(adduct_search_patterns)
+        self.make_grid()
 
-class khipu:
+    def make_grid(self):
+        '''Create a grid of m/z values as DataFrame.
+        adduct_pattern is computed using neutral mass as 0 offset.
+        The orders of isotope_search_patterns and adduct_search_patterns are kept in grid,
+        to enable easy mapping of edges to the grid.
+
+        Updates
+        -------
+        self.isotope_index
+        self.isotope_dict
+        self.adduct_pattern
+        self.adduct_dict
+        self._size, _M, _N
+        self.mzgrid : pd.DataFrame with isotopes as rows and adducts as cols
+        '''
+        _d, self.adduct_dict, self.isotope_dict = {}, {}, {}
+        self.isotope_index = ['M0'] + [x[1] for x in self.isotope_search_patterns]
+        for x in self.isotope_search_patterns:
+            self.isotope_dict[x[1]] = x[0]
+
+        self.adduct_pattern = make_expected_adduct_index(self.mode, self.adduct_search_patterns)
+        # [(PRONTON, M+H+), ..., (42.0338, ACN), ...]
+        self.adduct_index = [A[1] for A in self.adduct_pattern]
+        for A in self.adduct_pattern:
+            _d[A[1]] = [A[0]] + [A[0]+x[0] for x in self.isotope_search_patterns]
+            self.adduct_dict[A[1]] = A[0]
+
+        self._M, self._N = len(self.isotope_index), len(self.adduct_index)
+        self._size = self._M * self._N 
+        self.mzgrid = pd.DataFrame.from_dict(_d, index=self.isotope_index)       
+
+    def build_simple_pair_grid(self, e):
+        '''A khipu of only two nodes (one edge) does not need to go through full grid process,
+        and is formatted here. The full grid process would work for these simple cases, but less efficient.
+        neutral_mass is taken as average of two fitted values.
+        '''
+        mz1, mz2 = self.peak_dict[e[0]]['mz'], self.peak_dict[e[1]]['mz']
+        if mz1 > mz2:
+            e = (e[1], e[0], e[2])
+            mz1, mz2 = mz2, mz1
+
+        neutral_mass_1 = mz1 - self.adduct_pattern[0][0] # relative to M+H+ or M-H-
+        if e[2]['type'] == 'isotope':
+            grid = pd.DataFrame( {self.adduct_index[0]: [e[0], e[1]]},
+                            index=[self.isotope_index[0], e[2]['tag']], 
+                            dtype=str)
+            neutral_mass_2 = mz2 - self.isotope_dict[e[2]['tag']]
+            
+        else:           # adduct
+            grid = pd.DataFrame( {self.adduct_index[0]: [e[0]], e[2]['tag']: [e[1]]},
+                            index=[self.isotope_index[0],], 
+                            dtype=str)
+            neutral_mass_2 = mz2 - self.adduct_dict[e[2]['tag']]
+
+        neutral_mass = 0.5 * (neutral_mass_1 + neutral_mass_2)
+        return neutral_mass, grid
+
+    def build_branch_only_grid(self, sorted_mz_peak_ids):
+        '''When there's only a single adduct, this builds a branch for adduct_index[0].
+        isotope_index is fixed based on inital isotope_search_patterns.
+        returns neutral_mass, grid
+        '''
+        _d = realign_isotopes(sorted_mz_peak_ids, self.isotope_search_patterns)
+        # {'M0': F1, '13C/12C*2': F11, ...}
+        grid = pd.DataFrame.from_dict(
+            _d, orient="index", columns=[self.adduct_index[0]], dtype=str,
+        )
+        feature_map = {}
+        for k,v in _d:
+            feature_map[v] = (k, self.adduct_index[0])
+        neutral_mass = self.regress_neutral_mass(feature_map)
+        #neutral_mass = sorted_mz_peak_ids[0][0] - self.adduct_pattern[0][0] # relative to M+H+ or M-H-
+
+        return neutral_mass, grid, feature_map
+        
+    def build_trunk_only_grid(self, adduct_edges):
+        '''When no isotopes, only trunk is needed to describe adducts.
+        returns neutral_mass, grid
+        '''
+        root, edges = self.trunk_solver(adduct_edges)
+        _d = [{self.adduct_index[0]: root}, ]
+        for e in edges:
+            _d.append({e[2]['tag']: e[1]})
+        grid = pd.DataFrame(_d, index=[self.isotope_index[0],])
+        feature_map = {}
+        for k,v in _d:
+            feature_map[v] = (self.isotope_index[0], k)
+        neutral_mass = self.regress_neutral_mass(feature_map)
+
+        return neutral_mass, grid, feature_map
+
+    def regress_neutral_mass(self, feature_map):
+        '''Get neutral mass by regression on mapped features.
+        feature_map : {feature_id: (isotope_index, adduct_index)}
+        return 
+        '''
+        def _func(x, neu):
+            return x + neu
+        fixed_feature_list = list(feature_map.keys())
+        Y = [self.peak_dict[f]['mz'] for f in fixed_feature_list]
+        X = [self.mzgrid.at[feature_map[f][0], feature_map[f][1]] for f in fixed_feature_list]
+        popt, _ = curve_fit(_func, X, Y)
+        neutral_mass = popt[0]
+        return neutral_mass
+
+    def trunk_solver(self, adduct_edges, branch_dict={}):
+        '''Find best solution to fit a set of edges on the trunk. 
+        This uses score_graph_on_trunk to score matched graph, which can be 
+        abstracted_adduct_edges or regular adduct edges.
+
+        adduct_edges : m/z ordered edge with tag on edge ion relationship, [(n1, n2, relation), ...].
+        branch_dict : when abstract branch is used, this is the dict for memberships.
+
+        returns selected best root and subset of edges.
+        '''
+        nodes = set([])
+        for e in adduct_edges:
+            nodes.add(e[0])
+            nodes.add(e[1])
+        weights = {}
+        for x in nodes:
+            if x in branch_dict:
+                weights[x] = len(branch_dict[x])
+            else:
+                weights[x] = 1
+        
+        scored = sorted(
+            [self.score_graph_on_trunk(root, adduct_edges, weights) for root in nodes]
+        )
+        _, root, edges = scored[-1]
+
+        return root, edges
+
+    def score_graph_on_trunk(self, root, adduct_edges, weights):
+        '''Use weighted algorithm on reference adduct tree to calcualte match score.
+        returns score, root, selected_edges
+        '''
+        selected_edges = []
+        score = weights[root]
+        for e in adduct_edges:
+            if e[0] == root:
+                selected_edges.append(e)
+                score += weights[e[1]]
+
+        return score, root, selected_edges
+
+    def score_graph_on_grid(self, root_corrected_mz_features, mz_error=0.01):
+        '''Check how many values in root_corrected_mzs match to self.mzgrid; count = score.
+        returns score, feature_map
+        '''
+        feature_map = {}
+        for mz, f in root_corrected_mz_features:
+            delta = abs(self.mzgrid - mz)
+            if min(delta) < mz_error:
+                ii, jj = np.unravel_index( np.argmin(delta), self.mzgrid.shape )
+                feature_map[f] = (self.mzgrid.index[ii], self.mzgrid.columns[jj])
+
+        score = len(feature_map)
+
+        return score, feature_map
+
+
+
+    def build_full_grid(self, abstracted_adduct_edges, branch_dict, nodes_to_use):
+        '''Build a khipu grid, after the input network is cleaned to isotopic_edges and adduct_edges.
+        1) Get isotopic branches first, and treat them each branch as a node. This converts (U, V) to (U, B).
+            Done in Khipu.branch_abstraction().
+        2) Get optimal order of abstracted adduct_edges. Done in Weavor.trunk_solver(), by topology not involving m/z. 
+        3) Generate grids starting from the smallest m/z in each branch. Get the grid of best feature map.
+        4) Use the optimal feature map to set grids.
+
+        Parameters
+        ----------
+        abstracted_adduct_edges : list of nonredundant directed edges with data tag.
+            A node here can be a feature or a branch, which is a list of isotopes.
+        branch_dict : dictionary, branch ID to member features/nodes.
+
+        Notes
+        -----
+        We don't know the real root to start with, and can't assume the lowest m/z is M+H+ or M-H-.
+        The root should be inferred from best overall pattern match.
+        A pseudo-root is not necessarily M0, which may not be detected in perfect labeling experiments.
+
+        Enforce unique node per grid, by best rtime with future option of a fitness function (Khipu.clean()). 
+        Extra nodes go to a new khipu.
+        '''
+        mz_features = [(self.peak_dict[f]['mz'], f) for f in nodes_to_use]
+        root, edges = self.trunk_solver(abstracted_adduct_edges, branch_dict)
+        abstracted_adducts = [root, ]
+        abstracted_adduct_tags = [self.adduct_index[0], ]
+        for e in edges:
+            abstracted_adducts.append(e[1])
+            abstracted_adduct_tags.append(e[2]['tag'])
+
+        list_bagged_features = []
+        for x in abstracted_adducts:
+            list_bagged_features.append(branch_dict.get(x, [x]))
+
+        # this generates a list of possible neutral mass values
+        peudo_roots = [0, ]         # 0 will not be used, just spacer
+        for ii in range(len(abstracted_adducts)):
+            L = list_bagged_features[ii]
+            _offset = self.adduct_dict[abstracted_adduct_tags[ii]]
+            peudo_roots.append(
+                min([self.peak_dict[f]['mz'] for f in L]) - _offset
+            )
+
+        # will check which neutral mass is best fit
+        list_grid_fits = []
+        for ii in range(1, len(peudo_roots)):
+            if abs(peudo_roots[ii] - peudo_roots[ii-1]) > 0.000001 * self.mz_tolerance_ppm * peudo_roots[ii]:
+                score, feature_map = self.score_graph_on_grid(
+                    [(x[0] - peudo_roots[ii], x[1]) for x in mz_features]
+                )
+                list_grid_fits.append((score, ii, feature_map))  # ii used as tie breaker in sorting
+
+        best_feature_map = sorted(list_grid_fits, reverse=True)[0][2]
+        neutral_mass = self.regress_neutral_mass(best_feature_map)
+
+        grid = pd.DataFrame( np.empty((self._M, self._N), dtype=np.str),
+                            index=self.mzgrid.index,
+                            columns=self.mzgrid.columns,
+                            dtype=str)
+        for f,v in best_feature_map.items():
+            grid.loc[v] = f
+
+        return neutral_mass, grid, best_feature_map
+
+
+
+    def make_tree(self):
+        tree = treelib.Tree()
+        tree.create_node('M', 'M')
+        for node in [x[1] for x in self.adduct_pattern]:
+            tree.create_node(node, node, parent='M')
+            for m in self.isotope_index:
+                tree.create_node(m, m+node, parent=node)
+
+        return tree 
+
+
+    #---------- placeholders --------------
+    def select_by_fitness(self):
+        '''After a khipu frame is built, among redundant features, 
+        select the ones of best fitness score for the khipu.        
+        '''
+        pass
+
+    def fitness(self):
+        '''Fitness function of the khipu. 
+        More a placeholder for now. Because unique assignment of a feature to a khipu can be based on
+        a) closest retention time, and b) similar abundance patterns among adducts.
+        The a) is depdendent on how well the samples were analyzed and data were preprocessed.
+        The b) is not reliable as a pair of ions from another compound can still get good correlation 
+        by disrupting the adduct patterns together.
+        Default to a) is good enough for now.
+        '''
+        pass
+
+
+
+class Khipu:
     '''2-tier tree representation of an empirical compound.
     An empTree follows the matrix notion of a family of peaks: a tree of 2 levels - isotopes and adducts.
     A true root of khipu is the compound in neutral formula.
     A peudo root of khipu is the ion of lowest m/z.
     The representative adduct should have the most abundance.
     The matrix notion of a khipu is a DataFrame: columns are Adduct labels; rows isotopes.
+    trunk : default for adducts
+    branch : default for isotopes
     '''
-    def __init__(self, subnetwork, isotope_search_patterns, adduct_search_patterns):
+    def __init__(self, subnetwork):
         '''Do not include negative m/z difference in this class, as the node of lowest m/z is used as root.
         Neutral loss and fragments can be searched after khipu is established.
         Input subnetwork is undirected graph, but khipu will require directed graph/tree, by increasing m/z.
@@ -38,40 +316,53 @@ class khipu:
         
         self.is_13C_verified = False
         self.is_singleton = False
-        '''
-        self.input_network = subnetwork
+
         self.isotope_search_patterns = isotope_search_patterns
         self.adduct_search_patterns = adduct_search_patterns
 
-        self.nodes_to_use = []
-        self.annotation_dict = {}
-        self.redundant_nodes = []
-        self.pruned_network = None
 
+        self.adduct_index = indexed_adducts
+        self.adduct_index_labels = adduct_index_labels
+        self.branch_dict = branch_dict
+
+        self.annotation_dict = {}
         self.adduct_index = []
-        self.isotope_index = ['M0'] + [x[1] for x in isotope_search_patterns]
-        self.khipu_grid = []                # DataFrame of N x M, M number of isotopes, N number of adducts
+        
+
+        '''
+        self.input_network = subnetwork
+        self.nodes_to_use = []
+        self.redundant_nodes = []          # nodes in input_network but not in final khipu
+        self.pruned_network = None
+        self.exceptions = []
+        self.khipu_grid = {}                # DataFrame of N x M, M number of isotopes, N number of adducts
                                             # M is explicitly specified during search
                                             # N is dynamically determined on each khipu
 
 
-    def build_khipu(self, peak_dict, mz_tolerance_ppm=5, check_fitness=False):
+    def build_khipu(self, WeavorInstance, mz_tolerance_ppm=5, check_fitness=False):
         '''Convert a network of two types of edges, isotopic and adduct, to khipu instances of unique nodes.
         Use the grid to enforce unique ion in each position, as the initial network can contain 
         erroneously redundant leaves/nodes.
 
+        WeavorInstance : Weavor instance to solve the grid.
         check_fitness : if True, chech if replacing with any redundant nodes improves fitness. 
             This is a placeholder as a good fitness function is not easy to implement and it slows down computing.
+            Future use can be if check_fitness: self.select_by_fitness()
 
         Updates
         -------
         self.khipu_grid : pd.DataFrame
-        self.pruned_network : extra features and edges that are not fit in this khipu
+        self.neutral_mass : inferred neutral mass for the khipu compound
         '''
-        self.feature_dict, self.mzstr_dict = self.get_feature_dict(peak_dict, mz_tolerance_ppm)
+        self._size_limit_ = WeavorInstance._size    # Set max limit of feature number based on grid size
+        self.feature_dict, self.mzstr_dict = self.get_feature_dict(WeavorInstance.peak_dict, mz_tolerance_ppm)
+        
         if self.input_network.number_of_edges() == 1:
-            self.build_simple_pair_grid(peak_dict)
+            edge = self.input_network.edges(data=True)[0]
+            self.neutral_mass, self.khipu_grid = WeavorInstance.build_simple_pair_grid(edge)
             self.clean_network = self.input_network
+            self.nodes_to_use = list(self.clean_network.nodes)
         else:
             self.clean()
             self.clean_network = self.input_network.subgraph(self.nodes_to_use)
@@ -79,42 +370,32 @@ class khipu:
             for e in self.clean_network.edges(data=True):
                 if e[2]['type'] == 'isotope':
                     isotopic_edges.append(e)
-                else:                   # no other type of connections are allowed 
+                else:                   # adducts, no other type of edges are allowed 
                     adduct_edges.append(e)
-            
-            if isotopic_edges and adduct_edges:
-                self.build_full_grid(isotopic_edges, adduct_edges)
-            elif isotopic_edges :       # branch only A1 adduct
-                self.build_branch_only_grid()
-            else:                       # trunk only, no isotopes
-                self.build_trunk_only_grid(adduct_edges)
-            
-            if check_fitness:
-                self.select_by_fitness()
 
+            if isotopic_edges and adduct_edges:
+                abstracted_adduct_edges, branch_dict = self.branch_abstraction(
+                        isotopic_edges, adduct_edges
+                        )  
+                self.neutral_mass, self.khipu_grid, self.feature_map = WeavorInstance.build_full_grid(
+                        abstracted_adduct_edges, branch_dict, self.nodes_to_use
+                        )
+            elif isotopic_edges :       # branch only single adduct
+                self.neutral_mass, self.khipu_grid, self.feature_map = \
+                    WeavorInstance.build_branch_only_grid(self.sorted_mz_peak_ids)
+            else:                       # trunk only, no isotopes
+                self.neutral_mass, self.khipu_grid, self.feature_map = \
+                    WeavorInstance.build_trunk_only_grid(adduct_edges)
+            
+    def get_pruned_network(self):
+        '''Get extra features and edges that are not fit in this khipu.
+        Updates:
+        self.redundant_nodes
+        self.pruned_network
+        '''
+        self.redundant_nodes = [n for n in self.nodes_to_use if n not in self.feature_map]
         if self.redundant_nodes:
             self.pruned_network = self.input_network.subgraph(self.redundant_nodes)
-
-    def build_simple_pair_grid(self, peak_dict):
-        '''A khipu of only two nodes (one edge) does not need to go through full grid process,
-        and is formatted here. The full grid process would work for these simple cases, but less efficient.
-        '''
-        e = self.input_network.edges(data=True)[0]
-        if peak_dict[e[0]]['mz'] > peak_dict[e[1]]['mz']:
-            e = (e[1], e[0], e[2])
-        self.root = e[0]
-        if e[2]['type'] == 'isotope':
-            self.khipu_grid = pd.DataFrame( {'A1': [e[0], e[1]]},
-                            index=['M0', e[2]['tag']], 
-                            dtype=str)
-            self.annotation_dict[e[0]] = ('M0', 'A1')
-            self.annotation_dict[e[1]] = (e[2]['tag'], 'A1')
-        else:           # adduct
-            self.khipu_grid = pd.DataFrame( {'A1': [e[0]], e[2]['tag']: [e[1]]},
-                            index=['M0',], 
-                            dtype=str)
-            self.annotation_dict[e[0]] = ('M0', 'A1')
-            self.annotation_dict[e[1]] = ('M0', e[2]['tag'])
 
     def clean(self):
         '''Clean up the input subnetwork, only using unique features to build a khipu frame.
@@ -126,6 +407,9 @@ class khipu:
         because minor potential shift can confuse ion relations.
         This clean() may cut some initial edges.
         '''
+        if self.input_network.number_of_nodes() > self._size_limit_:
+            self.input_network = self.down_size()
+
         self.median_rtime = np.median([self.feature_dict[n]['rtime'] for n in self.input_network])
         for k,v in self.mzstr_dict.items():
             # v as list of node IDs
@@ -140,6 +424,17 @@ class khipu:
 
         self.sorted_mz_peak_ids = self.sort_nodes_by_mz()
         self.root = self.sorted_mz_peak_ids[0][1]
+
+    def down_size(self):
+        '''If input_network is too big, down size by selected the features of highest abundance.
+        The extra nodes are not kept, because they can be picked up by extended search later if they fit this Khipu.
+        '''
+        use_nodes = [
+            (self.feature_dict[n]['representative_intensity'], n) for n in self.input_network.nodes
+        ]
+        use_nodes = sorted(use_nodes, reverse=True)[:self._size_limit_]
+        new_network = self.input_network.subgraph(use_nodes)
+        return new_network
 
     def get_feature_dict(self, peak_dict, mz_tolerance_ppm):
         '''Index all input features; establish str identifier for features of same/close m/z values.
@@ -177,43 +472,6 @@ class khipu:
         '''
         return sorted( [(self.feature_dict[n]['mz'], n) for n in self.nodes_to_use ])
         
-    def build_full_grid(self, isotopic_edges, adduct_edges):
-        '''Build a khipu grid, after the input network is cleaned to isotopic_edges and adduct_edges.
-        1) Get isotopic branches first, and treat them each branch as a node. This converts (U, V) to (U, B)
-        2) Get minimum_spanning_tree, i.e. non-redundant adduct_edges from (U, B), 
-            which should contain necessary adduct_edges.
-        3) Order adducts as a vector, by topographic order. 
-        4)  Generate grid starting from smallest m/z as (M0, A1).
-        5) Match all nodes to the grid (snap_features_to_grid).
-
-        Parameters
-        ----------
-        isotopic_edges, adduct_edges : separated from self.input_network
-
-        Notes
-        -----
-        It's not a simple grid of combinations of isotope_search_patterns, adduct_search_patterns,
-        because each pattern may occur more than once.
-        Tree search methods don't always cover all edges, not a good choice.
-        If minimum_spanning_tree is calculated from self.input_network, the isotopic branch may not be fully connect.
-
-        Enforce unique node per grid, by best rtime with future option of a fitness function. 
-        Extra nodes go to a new khipu.
-        Designate feature of lowest m/z as root, which is often M+H+ or M-,  
-        as we do not include lower mz in the initial search.
-        A root is not necessarily M0, which may not be detected in perfect labeling experiments.
-        '''
-        abstracted_adduct_edges, root_branch, branch_dict = self.branch_abstraction(
-            isotopic_edges, adduct_edges
-        )
-        indexed_adducts, adduct_index_labels, expected_grid_mz_values = self.build_grid_abstracted(
-            abstracted_adduct_edges, root_branch
-        )
-        self.adduct_index = indexed_adducts
-        self.adduct_index_labels = adduct_index_labels
-        self.branch_dict = branch_dict
-        self.khipu_grid = self.snap_features_to_grid(branch_dict, expected_grid_mz_values)
-
     def branch_abstraction(self, isotopic_edges, adduct_edges):
         '''Abstract a group of connecgted isotopic featrures into a branch.
         Reduce the input network to a set of abstracted_adduct_edges (hence new tree) of B-nodes.
@@ -221,13 +479,13 @@ class khipu:
         Returns
         -------
         abstracted_adduct_edges : list of nonredundant directed edges with data tag
-        root_branch : ID of the branch where root feature (lowest m/z) resides
         branch_dict : dictionary, branch ID to member features/nodes.
 
         Notes
         -----
         Membership of B-nodes is returned as branch_dict, which is needed to realign to khipu grid.
         Without branch constraint, the grid realignment is error prone.
+        Not checking if abstracted_adduct_edges are fully connected.
         '''
         G = nx.Graph(isotopic_edges)
         subnetworks = [G.subgraph(c).copy() for c in nx.connected_components(G)]
@@ -235,13 +493,13 @@ class khipu:
         _ii = 0
         for g in subnetworks:
             nodes = list(g.nodes())
-            branch_id = "B" + str(_ii)
+            branch_id = "B" + str(_ii)            # id for internal use
             branch_dict[branch_id] = nodes
             for n in nodes:
                 _dict_branch[n] =  branch_id      # node membership is exclusive to subnetwork
             _ii += 1
 
-        root_branch = _dict_branch.get(self.root, self.root)
+        # root_branch = _dict_branch.get(self.root, self.root)
         tmp, tracker, abstracted_adduct_edges = [], [], []
         for e in adduct_edges:
             if self.feature_dict[e[0]]['mz'] > self.feature_dict[e[1]]['mz']:
@@ -256,142 +514,7 @@ class khipu:
                 abstracted_adduct_edges.append(e)
                 tracker.append(tt)
 
-        return abstracted_adduct_edges, root_branch, branch_dict
-
-    def snap_features_to_grid(self, branch_dict, expected_grid_mz_values):
-        '''Create khipu_grid. To snap each feature to the expected_grid_mz_values.
-
-        Parameters
-        ----------
-        branch_dict : dictionary, branch ID to member features/nodes.
-        expected_grid_mz_values : m/z values in a list of branches. 
-            List of lists, _N x _M, in same order as self.adduct_index.
-
-        Updates
-        -------
-        self.annotation_dict : the isotope and adduct notions for each feature.
-        self.redundant_nodes : features that do not fit DAG are sent to redundant_nodes.
-
-        Returns
-        -------
-        khipu_grid : pd.DataFrame, adducts as cols (trunk) and isotopes as rows (branches).
-
-        Notes
-        -----
-        DataFrame is better for khipu_grid, because easier to cast data types and keep matrix format.
-        Nested list or numpy array is harder to ensure correct matrix format.
-            The algorithm here has to respect established edges to avoid confusion. 
-        self.adduct_index and branch_dict define memberships in each adduct group.
-        The method below is very error prone:
-            for x in self.sorted_mz_peak_ids:
-                ii = np.argmin(abs(expected - x[0]))
-                khipu_grid.iloc[np.unravel_index(ii, expected.shape)] = x[1]
-        '''
-        _M, _N = len(self.isotope_index), len(self.adduct_index)
-        khipu_grid = pd.DataFrame( np.empty((_M, _N), dtype=np.str),
-                            index=self.isotope_index,
-                            columns=self.adduct_index_labels ,                  # adduct_index
-                            dtype=str)
-        for jj in range(_N):
-            # get cooridnate for each matched isotope
-            if self.adduct_index[jj] in branch_dict:
-                isotopes = branch_dict[self.adduct_index[jj]]
-            else:
-                isotopes = [self.adduct_index[jj]]                      # single feature
-            for F in isotopes:
-                ii = np.argmin([abs(x-self.feature_dict[F]['mz']) for x in expected_grid_mz_values[jj]])
-                khipu_grid.iloc[ii, jj] = F
-                self.annotation_dict[F] = (self.isotope_index[ii], self.adduct_index_labels[jj])
-        
-        for n in self.nodes_to_use:
-            if n not in self.annotation_dict:
-                self.redundant_nodes.append(n)
-
-        return khipu_grid
-
-    def build_branch_only_grid(self):
-        '''When there's only a single adduct, this builds a branch for 'A1'.
-        isotope_index is fixed based on inital isotope_search_patterns.
-        isotopic_edges not needed as we re-align nodes.
-        Updates self.khipu_grid
-        '''
-        _d = realign_isotopes(self.sorted_mz_peak_ids, self.isotope_search_patterns)
-        self.khipu_grid = pd.DataFrame.from_dict(
-            _d, orient="index", columns=['A1'], dtype=str,
-        )
-        for k,v in _d.items():
-            self.annotation_dict[v] = (k, 'A1')
-        
-    def build_trunk_only_grid(self, adduct_edges):
-        '''When no isotopes, only trunk is needed to describe adducts.
-        Updates self.khipu_grid
-        '''
-        adduct_edges = nx.minimum_spanning_tree(nx.Graph(adduct_edges)).edges(data=True)
-        dict_node_label = {}
-        for e in adduct_edges:
-            if self.feature_dict[e[0]]['mz'] > self.feature_dict[e[1]]['mz']:
-                e = (e[1], e[0], e[2])
-            dict_node_label[e[1]] = '(' + e[0] + '+' + e[2]['tag'] + ')'
-
-        DG = nx.DiGraph(adduct_edges)
-        indexed_adducts = list(nx.topological_sort(DG))     # ordered node IDs
-        self.adduct_index = [dict_node_label.get(x, x) for x in indexed_adducts]
-        self.khipu_grid = pd.DataFrame.from_dict(
-            {"M": indexed_adducts}, 
-            orient="index", columns=self.adduct_index, dtype=str,
-        )
-        for x in indexed_adducts:
-            self.annotation_dict[x] = ('M', dict_node_label.get(x, x))
-
-    def build_grid_abstracted(self, abstracted_adduct_edges, root_branch):
-        '''Compute grid structure and expected_grid_mz_values.
-
-        Parameters
-        ----------
-        abstracted_adduct_edges : directed edges that connect B-nodes based on adduct m/z difference not isotopes.
-            B-nodes are abstracted branches from isotopes during grid building.
-
-        Returns
-        -------
-        indexed_adducts : a list containing ordered adducts (some are abstracted branches)
-        adduct_index_labels : annotation companion to adduct_index, list of same node order
-        expected_grid_mz_values : calculated m/z values for khipu grid based on self.root, indexed_adducts 
-            and self.isotope_search_patterns.
-
-        Notes
-        -----
-        To compute m/z from abstracted_adduct_edges, we need to determine the nodes for khipu trunk and their order.
-        Build a DiGraph which should be DAG. Use nx.dfs_edges to walk the DAG.
-        Grid is computed on the trunk (from walking DAG) and isotope_search_patterns.
-        '''
-        root_mz = self.feature_dict[self.root]['mz']
-        adduct_mz_dict, mz_modification_dict, node_mz_dict = {}, {}, {root_branch: root_mz}
-        dict_node_label = {}
-        for a in self.adduct_search_patterns:
-            adduct_mz_dict[a[1]] = a[0]
-        for e in abstracted_adduct_edges:
-            mz_modification_dict[make_edge_tag((e[0], e[1]))] = adduct_mz_dict[e[2]['tag']]
-            # e[1] + 
-            dict_node_label[e[1]] = e[0] + '+' + e[2]['tag']
-
-        DG = nx.DiGraph(abstracted_adduct_edges)
-        # walk the graph through all nodes, and build trunk in that order
-        indexed_adducts, trunk_mzlist = [root_branch, ], [root_mz, ]
-        for e in nx.dfs_edges(DG, source=root_branch):
-            indexed_adducts.append(e[1])
-            target_mz = node_mz_dict[e[0]] + mz_modification_dict[make_edge_tag((e[0], e[1]))]
-            # e[0] is guanranteed to be in node_mz_dict due to the tree walking order
-            node_mz_dict[e[1]] = target_mz
-            trunk_mzlist.append(target_mz)
-            
-        adduct_index_labels = [dict_node_label.get(x, x) for x in indexed_adducts]
-        expected_grid_mz_values = []
-        for A in trunk_mzlist:
-            expected_grid_mz_values.append(
-                [A] + [A+x[0] for x in self.isotope_search_patterns]
-            ) 
-
-        return indexed_adducts, adduct_index_labels, expected_grid_mz_values
+        return abstracted_adduct_edges, branch_dict
 
     def extended_search(self, mztree, adduct_search_patterns_extended, mz_tolerance_ppm=5, rt_tolerance=2):
         '''Find additional adducts from unassigned_peaks using adduct_search_patterns_extended.
@@ -423,9 +546,9 @@ class khipu:
                 for P2 in tmp:
                     delta_rtime = abs(P1['rtime']-P2['rtime'])
                     if delta_rtime <= rt_tolerance:
-                        _match.append((delta_rtime, P2))
+                        _match.append((delta_rtime, P2['id'], P2))    # need id to break tie in sorting
                 if _match:      # get best match by rtime only 
-                    best_match_peak = sorted(_match)[0][1]
+                    best_match_peak = sorted(_match)[0][-1]
                     e1 = best_match_peak['id']
                     matched.append( (n, e1, relation) )
                     # P2 = P1 + adduct_relation. ',' avoids overwriting of existing names in khipu_grid
@@ -460,7 +583,6 @@ class khipu:
                     abundance_matrix.iloc[ii, jj] = self.feature_dict[self.khipu_grid.iloc[ii,jj]
                                                                 ]['representative_intensity']
         return abundance_matrix
-
 
     #---------- export and visual --------------
     def print_khipu(self):
@@ -510,7 +632,6 @@ class khipu:
         
         #fig.tight_layout()
         plt.show()
-
 
     def plot_khipu_diagram_rotated(self):
         pass
@@ -565,21 +686,3 @@ class khipu:
     print2 = print_khipu_rotated
     plot = plot_khipu_diagram
     plot2 = plot_khipu_diagram_rotated
-
-    #---------- placeholders --------------
-    def select_by_fitness(self):
-        '''After a khipu frame is built, among redundant features, 
-        select the ones of best fitness score for the khipu.        
-        '''
-        pass
-
-    def fitness(self):
-        '''Fitness function of the khipu. 
-        More a placeholder for now. Because unique assignment of a feature to a khipu can be based on
-        a) closest retention time, and b) similar abundance patterns among adducts.
-        The a) is depdendent on how well the samples were analyzed and data were preprocessed.
-        The b) is not reliable as a pair of ions from another compound can still get good correlation 
-        by disrupting the adduct patterns together.
-        Default to a) is good enough for now.
-        '''
-        pass

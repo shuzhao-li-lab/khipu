@@ -172,3 +172,129 @@ def merge_trees_by_derivatization(trees, list_peaks,
     # return add_data_to_tag(trees)
     return trees
 
+
+class not_use:
+    def build_grid_abstracted(self, abstracted_adduct_edges, root_branch):
+        '''Compute grid structure and expected_grid_mz_values. 
+        This uses DAG traversal but more complex than necessary, and does not find neutral mass.
+
+        Parameters
+        ----------
+        abstracted_adduct_edges : directed edges that connect B-nodes based on adduct m/z difference not isotopes.
+            B-nodes are abstracted branches from isotopes during grid building.
+
+        Returns
+        -------
+        indexed_adducts : a list containing ordered adducts (some are abstracted branches)
+        adduct_index_labels : annotation companion to adduct_index, list of same node order
+        expected_grid_mz_values : calculated m/z values for khipu grid based on self.root, indexed_adducts 
+            and self.isotope_search_patterns.
+
+        Notes
+        -----
+        To compute m/z from abstracted_adduct_edges, we need to determine the nodes for khipu trunk and their order.
+        Build a DiGraph which should be DAG. Use nx.dfs_edges to walk the DAG.
+        Grid is computed on the trunk (from walking DAG) and isotope_search_patterns.
+
+        '''
+        root_mz = self.feature_dict[self.root]['mz']
+        adduct_mz_dict, mz_modification_dict, node_mz_dict = {}, {}, {root_branch: root_mz}
+        dict_node_label = {}
+        for a in self.adduct_search_patterns:
+            adduct_mz_dict[a[1]] = a[0]
+        for e in abstracted_adduct_edges:
+            mz_modification_dict[make_edge_tag((e[0], e[1]))] = adduct_mz_dict[e[2]['tag']]
+            # e[1] + 
+            dict_node_label[e[1]] = e[0] + '+' + e[2]['tag']
+
+        DG = nx.DiGraph(abstracted_adduct_edges)
+        # walk the graph through all nodes, and build trunk in that order
+        indexed_adducts, trunk_mzlist = [root_branch, ], [root_mz, ]
+
+        try:
+            for e in nx.dfs_edges(DG, source=root_branch):
+                indexed_adducts.append(e[1])
+                target_mz = node_mz_dict[e[0]] + mz_modification_dict[make_edge_tag((e[0], e[1]))]
+                # e[0] is guanranteed to be in node_mz_dict due to the tree walking order
+                node_mz_dict[e[1]] = target_mz
+                trunk_mzlist.append(target_mz)
+
+        except KeyError:
+            print("DAG violation: ", root_mz, self.root)
+            self.exceptions.append("DAG violation")
+            # print(DG.edges())
+            G = nx.Graph(abstracted_adduct_edges)
+            indexed_adducts, trunk_mzlist = [root_branch, ], [root_mz, ]
+            for e in nx.bfs_edges(G, source=root_branch):
+                indexed_adducts.append(e[1])
+                target_mz = node_mz_dict[e[0]] + mz_modification_dict[make_edge_tag((e[0], e[1]))]
+                node_mz_dict[e[1]] = target_mz
+                trunk_mzlist.append(target_mz)
+
+        adduct_index_labels = [dict_node_label.get(x, x) for x in indexed_adducts]
+        expected_grid_mz_values = []
+        for A in trunk_mzlist:
+            expected_grid_mz_values.append(
+                [A] + [A+x[0] for x in self.isotope_search_patterns]
+            ) 
+
+        return indexed_adducts, adduct_index_labels, expected_grid_mz_values
+
+
+    def snap_features_to_grid(self, branch_dict, expected_grid_mz_values):
+        '''Create khipu_grid. To snap each feature to the expected_grid_mz_values.
+
+        Parameters
+        ----------
+        branch_dict : dictionary, branch ID to member features/nodes.
+        expected_grid_mz_values : m/z values in a list of branches. 
+            List of lists, _N x _M, in same order as self.adduct_index.
+
+        Updates
+        -------
+        self.annotation_dict : the isotope and adduct notions for each feature.
+        self.redundant_nodes : features that do not fit DAG are sent to redundant_nodes.
+
+        Returns
+        -------
+        khipu_grid : pd.DataFrame, adducts as cols (trunk) and isotopes as rows (branches).
+
+        Notes
+        -----
+        DataFrame is better for khipu_grid, because easier to cast data types and keep matrix format.
+        Nested list or numpy array is harder to ensure correct matrix format.
+            The algorithm here has to respect established edges to avoid confusion. 
+        self.adduct_index and branch_dict define memberships in each adduct group.
+        The method below is very error prone:
+            for x in self.sorted_mz_peak_ids:
+                ii = np.argmin(abs(expected - x[0]))
+                khipu_grid.iloc[np.unravel_index(ii, expected.shape)] = x[1]
+
+        If isotope_search_patterns and adduct_search_patterns are not used propersly,
+        each pattern may occur more than once. Not all edges in input network belong to this Khipu.
+        Tree search methods don't always cover all edges, not a good choice.
+        If minimum_spanning_tree is calculated from self.input_network, the isotopic branch may not be fully connected.
+
+        '''
+        _M, _N = len(self.isotope_index), len(self.adduct_index)
+        khipu_grid = pd.DataFrame( np.empty((_M, _N), dtype=np.str),
+                            index=self.isotope_index,
+                            columns=self.adduct_index_labels ,                  # adduct_index
+                            dtype=str)
+        for jj in range(_N):
+            # get cooridnate for each matched isotope
+            if self.adduct_index[jj] in branch_dict:
+                isotopes = branch_dict[self.adduct_index[jj]]
+            else:
+                isotopes = [self.adduct_index[jj]]                      # single feature
+            for F in isotopes:
+                ii = np.argmin([abs(x-self.feature_dict[F]['mz']) for x in expected_grid_mz_values[jj]])
+                khipu_grid.iloc[ii, jj] = F
+                self.annotation_dict[F] = (self.isotope_index[ii], self.adduct_index_labels[jj])
+        
+        for n in self.nodes_to_use:
+            if n not in self.annotation_dict:
+                self.redundant_nodes.append(n)
+
+        return khipu_grid
+

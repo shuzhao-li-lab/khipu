@@ -7,18 +7,27 @@ import numpy as np
 import networkx as nx
 from mass2chem.search import build_centurion_tree, find_all_matches_centurion_indexed_list
 
-adduct_search_patterns = [  (21.9820, 'Na/H'), 
-                            (41.026549, 'Acetonitrile'),
+#
+# m/z differences corresponding to adducts and isotopes
+# Not using charge in tables, because all m/z diff is relative to other charged ions
+#
+PROTON = 1.00727646677
+electron = 0.000549
+
+# avoid confusing adducts in initial search, e.g. H, H2O
+adduct_search_patterns = [  # initial patterns are relative to M+H+
+                            (21.9820, 'Na/H'),
+                            (41.026549, 'ACN'),     # Acetonitrile
                             (17.02655, 'NH3'),
                             (35.9767, 'HCl'),
                             (37.955882, 'K/H'),
                             ]
 
-adduct_search_patterns_neg = [ (34.969402, 'Cl-'), 
-                            (44.998201, 'COOH-'),
+adduct_search_patterns_neg = [ (35.9767, 'HCl'), 
+                            (46.00548, 'HCOOH'),
                             (17.02655, 'NH3'),
                             (21.9820, 'Na/H'), 
-                            (41.026549, 'Acetonitrile'),
+                            (41.026549, 'ACN'),
                             (35.9767, 'HCl'),
                             (37.955882, 'K/H'),
                             ]
@@ -46,12 +55,25 @@ extended_adducts = [(1.0078, 'H'),
                             (37.94694, 'Ca/H2'),
                             (32.026215, 'MeOH'),
                             (43.96389, 'Na2/H2'),
-                            (46.00548, 'HCOOH'),
                             (67.987424, 'NaCOOH'),
                             (83.961361, 'KCOOH'),
                             (97.96737927, 'H2SO4'),
                             (97.97689507, 'H3PO4'),
 ]
+
+
+def make_expected_adduct_index(mode='pos', 
+                               pattern=[(21.9820, 'Na/H'), (41.026549, 'ACN')]):
+    '''Construct the adduct list for a core list of adduct m/z diff patterns. 
+    Use neutral mass as 0 offset, so that later regression will compute neutral mass.
+    Not modify adduct tag, so that the edges can be later mapped correctly.
+    '''
+    if mode == 'pos':
+        # pos base ion as M+H+
+        return [(PROTON, 'M+H+'), ] + [(x[0] + PROTON, x[1]) for x in pattern] 
+    else:
+        # neg base ion as M-H[-]
+        return [-PROTON, 'M-H[-]'] + [(x[0] - PROTON, x[1]) for x in pattern]
 
 
 def read_features_from_text(text_table, 
@@ -223,7 +245,7 @@ def get_isotopic_edge_pairs(list_peaks,
 
 def get_adduct_edge_pairs(list_peaks, 
                     mztree, 
-                    search_patterns = [(1.0078, 'H'), (21.9820, 'Na/H'), (41.026549, 'Acetonitrile')],
+                    search_patterns = [(1.0078, 'H'), (21.9820, 'Na/H'), (41.026549, 'ACN')],
                     mz_tolerance_ppm=5, rt_tolerance=2,
                     ):
     '''
@@ -263,9 +285,8 @@ def peaks_to_networks(peak_list,
                                         (4.01342, '13C/12C*4', (0, 0.8)),
                                         (5.016775, '13C/12C*5', (0, 0.8)),
                                         (6.02013, '13C/12C*6', (0, 0.8)),], 
-                    adduct_search_patterns = [ (1.0078, 'H'), 
-                                        (21.9820, 'Na/H'), 
-                                        (41.026549, 'Acetonitrile')
+                    adduct_search_patterns = [ (21.9820, 'Na/H'), 
+                                        (41.026549, 'ACN')
                                         ],
                     mz_tolerance_ppm=5, 
                     rt_tolerance=2, 
@@ -349,7 +370,7 @@ def peaks_to_networks(peak_list,
 
 def realign_isotopes(sorted_mz_peak_ids, isotope_search_patterns, mz_tolerance=0.01):
     '''To snap isotopic branch. Assume lowest m/z as M0, and re-align other features against M0.
-        Because edges in g can be relationship between any pairs. 
+        Because edges in input_network can be relationship between any pairs. 
         Re-alignment will get them consistent on grid.
         No redundant features are allowed here, whihc are handled in khipu.clean().
 
@@ -367,8 +388,8 @@ def realign_isotopes(sorted_mz_peak_ids, isotope_search_patterns, mz_tolerance=0
     for p in sorted_mz_peak_ids[1:]:
         match = get_isotope_pattern_name(p[0] - M0[0], isotope_search_patterns, mz_tolerance)
         if match == 'Unknown':
-            _d["? " + p[1]] = p[1]
-            print(p)
+            # _d["? " + p[1]] = p[1]
+            print("Unknown isotope match ~ ", p)
         else:
             _d[match] = p[1]
 
@@ -463,6 +484,17 @@ def find_trees_by_datatag_list(trees, datatag_list=["13C/12C",
     '''
     return [find_trees_by_datatag(trees, datatag) for datatag in datatag_list]
 
+def __join_pos_anno(a):
+    if '/H' in a:
+        return 'M+H+' + a.replace('/H', '')
+    else:
+        return 'M+H+' + a
+
+def __get_mz_neg(x):
+    if x[1][-1] == '-':     # charged
+        return x[0]
+    else:
+        return x[0]-PROTON
 
 def __mass_pair_mapping(list1, list2):
     '''Placeholder. Find best matched value_index in list2 for each value in list1.
