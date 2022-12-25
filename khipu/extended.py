@@ -97,14 +97,15 @@ class khipu_diagnosis(Khipu):
         root_node = int(peak_dict[self.root]['mz']) - 1
         tree.create_node(str(root_node), root_node)
         # tree depth = 2, defined by khipu
-        for n in self.adduct_index:
+        for n in self.khipu_grid.columns:
             pdata = peak_dict.get(n, {})
             plabel = n
             if pdata:
                 plabel = make_peak_tag(pdata)
             tree.create_node(plabel, n, parent=root_node, data=pdata)
-            if n in self.branch_dict:
-                for b in self.branch_dict[n]:
+            for m in self.khipu_grid.index:
+                b = self.khipu_grid.loc[m, n]
+                if b:
                     tree.create_node(make_peak_tag(peak_dict[b]), b, parent=n, data=peak_dict[b])
 
         self.khipu_tree = tree
@@ -163,9 +164,15 @@ def khipu_annotate(args):
                     mz_tolerance_ppm=args.ppm,
                     rt_tolerance=args.rtol,
     )
-    
+    WV = Weavor(peak_dict, isotope_search_patterns=isotope_search_patterns, 
+                adduct_search_patterns=adduct_patterns, 
+                mz_tolerance_ppm=args.ppm, mode=args.mode)
+    print("\n\n")
+    print("Initial khipu search grid: ")
+    print(WV.mzgrid)
+
     khipu_list = peak_dict_to_khipu_list(
-        subnetworks, peak_dict, isotope_search_patterns, adduct_patterns
+        subnetworks, WV, mz_tolerance_ppm=args.ppm,
         )
     khipu_list, all_assigned_peaks = extend_khipu_list(khipu_list, peak_dict, extended_adducts)
 
@@ -180,31 +187,28 @@ def khipu_annotate(args):
         json.dump(empCpds, f, ensure_ascii=False, indent=2)
 
 
-def peak_dict_to_khipu_list(subnetworks, peak_dict, isotope_search_patterns, adduct_search_patterns):
+def peak_dict_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
     '''Generate full khipu_list from subnetworks, 
     including iterative khipus based on features pruned out of initial subnetwork.
-
-
     '''
     khipu_list = []
     for g in subnetworks:
-        # if g.size() < 50:
-        KP = Khipu(g, isotope_search_patterns, adduct_search_patterns)
-        KP.build_khipu(peak_dict)
+        KP = Khipu(g)
+        KP.build_khipu(WeavorInstance, mz_tolerance_ppm)
         khipu_list.append(KP)
-        while KP.redundant_nodes and KP.pruned_network.edges():
+        while KP.redundant_nodes and KP.pruned_network and KP.pruned_network.edges():
             # make sure pruned_network is connected
             more_subnets = [KP.pruned_network.subgraph(c).copy() 
                                     for c in nx.connected_components(KP.pruned_network)]
             for _G in more_subnets:
                 KP = Khipu(_G, isotope_search_patterns, adduct_search_patterns)
-                KP.build_khipu(peak_dict)
+                KP.build_khipu(WeavorInstance, mz_tolerance_ppm)
                 khipu_list.append(KP)
 
     # assign IDs
     ii = 0
     for KP in khipu_list:
-        base_mz = int(peak_dict[KP.root]['mz']) - 1
+        base_mz = str(round(KP.neutral_mass, 4))
         ii += 1
         KP.id = 'kp' + str(ii) + "_" + str(base_mz)
 

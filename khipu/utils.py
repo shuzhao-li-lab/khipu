@@ -18,14 +18,12 @@ electron = 0.000549
 adduct_search_patterns = [  # initial patterns are relative to M+H+
                             (21.9820, 'Na/H'),
                             (41.026549, 'ACN'),     # Acetonitrile
-                            (17.02655, 'NH3'),
                             (35.9767, 'HCl'),
                             (37.955882, 'K/H'),
                             ]
 
 adduct_search_patterns_neg = [ (35.9767, 'HCl'), 
                             (46.00548, 'HCOOH'),
-                            (17.02655, 'NH3'),
                             (21.9820, 'Na/H'), 
                             (41.026549, 'ACN'),
                             (35.9767, 'HCl'),
@@ -49,6 +47,7 @@ isotope_search_patterns = [ (1.003355, '13C/12C', (0, 0.8)),
 extended_adducts = [(1.0078, 'H'),
                             (10.991, 'Na/H, double charged'),
                             (0.5017, '13C/12C, double charged'),
+                            (17.02655, 'NH3'),
                             (18.0106, 'H2O'),      # easy to confuse with bio reactions
                             (18.033823, 'M+NH4'),
                             (27.01089904, 'HCN'),

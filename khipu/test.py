@@ -5,7 +5,7 @@ To run test from top directory:
 import urllib.request
 import numpy as np
 
-from .model import khipu
+from .model import Khipu
 from .extended import *
 from .utils import *
 
@@ -26,21 +26,22 @@ def test_read_url(url='https://github.com/shuzhao-li/khipu/raw/main/testdata/ful
 # -----------------------------------------------------------------------------
 #
 if __name__ == '__main__':
+
     subnetworks, peak_dict, edge_dict = test_read_url()
     big = [g for g in subnetworks if g.size()>15]
 
-    WV = Weavor(isotope_search_patterns, adduct_search_patterns, 'pos')
+    WV = Weavor(peak_dict, isotope_search_patterns, adduct_search_patterns, 
+                mz_tolerance_ppm=5, mode='pos')
 
+    print(WV.mzgrid)
 
     print("\n\n")
     print("Example khipu of one empirical compound from demo data.")
-    KP = khipu_diagnosis(big[ 1 ], isotope_search_patterns, adduct_search_patterns)
+    KP = khipu_diagnosis(big[ 1 ])
     print("Input network edges: ")
     print(KP.input_network.edges(data=True))
 
-
-    KP.build_khipu(WV, peak_dict)
-
+    KP.build_khipu(WV)
 
     print(KP.sorted_mz_peak_ids, "\n")
     KP.show_trimming()
@@ -71,8 +72,8 @@ if __name__ == '__main__':
     print("Multiple example khipus: ")
     print("======================== \n")
     for g in big[ -6: ]:
-        KP = khipu(g, isotope_search_patterns, adduct_search_patterns)
-        KP.build_khipu(peak_dict)
+        KP = Khipu(g)
+        KP.build_khipu(WV)
         print(KP.sorted_mz_peak_ids, "\n")
         KP.print_khipu()
         print('\n\n')
@@ -82,7 +83,7 @@ if __name__ == '__main__':
     print("================================================== \n")
 
     khipu_list = peak_dict_to_khipu_list(
-        subnetworks, peak_dict, isotope_search_patterns, adduct_search_patterns)
+        subnetworks, WV, mz_tolerance_ppm=5)
     
     # khipu_list = extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended)
     print("\n\n ~~~~~~ Got %d khipus ~~~~~~~ \n\n" %len(khipu_list))

@@ -13,6 +13,10 @@ Install as a package:
 Run from source code:
     python3 -m khipu.main -i testdata/full_Feature_table.tsv -o this_test
 
+Run test:
+    python3 -m khipu.test
+    (This downloads and uses test data from GitHub.)
+
 ## Why tree?
 Grouping ions in mass spectrometry data to their origin compound is a key step of data annotation.
 It's a common practice to search the data for signatures of mass differences, 
@@ -99,18 +103,34 @@ For high m/z values, their difference is sensitive to measurement errors.
 In this khipu library, we 
 1. separate isotope edges and adduct edges.
 2. treat all connected isotope edges as one branch.
-3. establish a "trunk" of ordered adducts.
+3. establish a "trunk" of optimized list of adducts.
 4. asssign each isotopic branch to the adduct trunk.
 5. align isotopes in all branches to establish the khipu grid. 
 
 Some ions may come into the initial network by mistakes or unresolved signals.
 The are removed from the established khipu by clean-up rules, and sent off to form a new khipu.
 
-## Applicable to isotope tracing and chemical derivatization
+## The khipu grid
+
+Initial grid may look like this:
+
+                    M+H+        NH3       Na/H        HCl        K/H        ACN
+    M0           1.007276  18.033826  22.989276  36.983976  38.963158  42.033825
+    13C/12C      2.010631  19.037181  23.992631  37.987331  39.966513  43.037180
+    13C/12C*2    3.013986  20.040536  24.995986  38.990686  40.969868  44.040535
+    13C/12C*3    4.017341  21.043891  25.999341  39.994041  41.973223  45.043890
+    13C/12C*4    5.020696  22.047246  27.002696  40.997396  42.976578  46.047245
+    13C/12C*5    6.024051  23.050601  28.006051  42.000751  43.979933  47.050600
+    13C/12C*6    7.027406  24.053956  29.009406  43.004106  44.983288  48.053955
+
+This can be extended by searching for additional ions. But the core construction should be done first.
+
+## Applicable to isotope tracing
 The search pattern for isotopes is often dependent on the biochemical experiment.
 Users can overwrite the default by supplying their search patterns (see demo notebooks).
 Search patterns are separate from search functions, lending flexibiliy to data analysis.
 
+The next step is to apply Khipu to chemical derivatization experiments.
 In chemical derivatization experiments, the origin compound and derivatized compound can be both measured in the LC-MS data.
 We have separate khipu trees for each, then link them by the m/z shift from derivatization.
 Because derivatization is a reaction that occurs before LC-MS, and

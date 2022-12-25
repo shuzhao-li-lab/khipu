@@ -63,7 +63,7 @@ class Weavor:
 
         self._M, self._N = len(self.isotope_index), len(self.adduct_index)
         self._size = self._M * self._N 
-        self.mzgrid = pd.DataFrame.from_dict(_d, index=self.isotope_index)       
+        self.mzgrid = pd.DataFrame(_d, index=self.isotope_index)       
 
     def build_simple_pair_grid(self, e):
         '''A khipu of only two nodes (one edge) does not need to go through full grid process,
@@ -80,6 +80,10 @@ class Weavor:
             grid = pd.DataFrame( {self.adduct_index[0]: [e[0], e[1]]},
                             index=[self.isotope_index[0], e[2]['tag']], 
                             dtype=str)
+            feature_map = {
+                e[0]: (self.isotope_index[0], self.adduct_index[0]), 
+                e[1]: (e[2]['tag'], self.adduct_index[0]),
+            }
             neutral_mass_2 = mz2 - self.isotope_dict[e[2]['tag']]
             
         else:           # adduct
@@ -87,9 +91,13 @@ class Weavor:
                             index=[self.isotope_index[0],], 
                             dtype=str)
             neutral_mass_2 = mz2 - self.adduct_dict[e[2]['tag']]
+            feature_map = {
+                e[0]: (self.isotope_index[0], self.adduct_index[0]), 
+                e[1]: (self.isotope_index[0], e[2]['tag']),
+            }
 
         neutral_mass = 0.5 * (neutral_mass_1 + neutral_mass_2)
-        return neutral_mass, grid
+        return neutral_mass, grid, feature_map
 
     def build_branch_only_grid(self, sorted_mz_peak_ids):
         '''When there's only a single adduct, this builds a branch for adduct_index[0].
@@ -102,7 +110,7 @@ class Weavor:
             _d, orient="index", columns=[self.adduct_index[0]], dtype=str,
         )
         feature_map = {}
-        for k,v in _d:
+        for k,v in _d.items():
             feature_map[v] = (k, self.adduct_index[0])
         neutral_mass = self.regress_neutral_mass(feature_map)
         #neutral_mass = sorted_mz_peak_ids[0][0] - self.adduct_pattern[0][0] # relative to M+H+ or M-H-
@@ -114,12 +122,12 @@ class Weavor:
         returns neutral_mass, grid
         '''
         root, edges = self.trunk_solver(adduct_edges)
-        _d = [{self.adduct_index[0]: root}, ]
+        _d = {self.adduct_index[0]: root}
         for e in edges:
-            _d.append({e[2]['tag']: e[1]})
+            _d[e[2]['tag']] = e[1]
         grid = pd.DataFrame(_d, index=[self.isotope_index[0],])
         feature_map = {}
-        for k,v in _d:
+        for k,v in _d.items():
             feature_map[v] = (self.isotope_index[0], k)
         neutral_mass = self.regress_neutral_mass(feature_map)
 
@@ -187,14 +195,13 @@ class Weavor:
         feature_map = {}
         for mz, f in root_corrected_mz_features:
             delta = abs(self.mzgrid - mz)
-            if min(delta) < mz_error:
+            if delta.values.min() < mz_error:
                 ii, jj = np.unravel_index( np.argmin(delta), self.mzgrid.shape )
                 feature_map[f] = (self.mzgrid.index[ii], self.mzgrid.columns[jj])
 
         score = len(feature_map)
 
         return score, feature_map
-
 
 
     def build_full_grid(self, abstracted_adduct_edges, branch_dict, nodes_to_use):
@@ -261,7 +268,6 @@ class Weavor:
             grid.loc[v] = f
 
         return neutral_mass, grid, best_feature_map
-
 
 
     def make_tree(self):
@@ -360,9 +366,10 @@ class Khipu:
         
         if self.input_network.number_of_edges() == 1:
             edge = self.input_network.edges(data=True)[0]
-            self.neutral_mass, self.khipu_grid = WeavorInstance.build_simple_pair_grid(edge)
+            self.neutral_mass, self.khipu_grid, self.feature_map =\
+                        WeavorInstance.build_simple_pair_grid(edge)
             self.clean_network = self.input_network
-            self.nodes_to_use = list(self.clean_network.nodes)
+            self.nodes_to_use = list(self.clean_network.nodes())
         else:
             self.clean()
             self.clean_network = self.input_network.subgraph(self.nodes_to_use)
@@ -516,15 +523,17 @@ class Khipu:
 
         return abstracted_adduct_edges, branch_dict
 
-    def extended_search(self, mztree, adduct_search_patterns_extended, mz_tolerance_ppm=5, rt_tolerance=2):
+    def extended_search(self, 
+                        mztree, adduct_search_patterns_extended, 
+                        mz_tolerance_ppm=5, rt_tolerance=2):
         '''Find additional adducts from unassigned_peaks using adduct_search_patterns_extended.
         mztree here are indexed unassigned_peaks.
 
         Updates
         -------
-        self.annotation_dict
+        self.feature_map
         self.khipu_grid
-        self.adduct_index_labels
+        # self.adduct_index_labels
 
         Returns
         -------
@@ -534,8 +543,8 @@ class Khipu:
         -----
         annotation_dict may have fewer nodes than nodes_to_use, but is preferred here for cleaner results.
         '''
-        matched, _new_anno_dict, _grid_dict = [], {}, {}
-        for n, v in self.annotation_dict.items():
+        matched, _new_anno_dict = [], {}
+        for n, v in self.feature_map.items():
             _iso, _ad = v
             P1 = self.feature_dict[n]
             for _pair in adduct_search_patterns_extended:
@@ -556,16 +565,17 @@ class Khipu:
                     self.feature_dict[e1] = best_match_peak
 
         _new_adduct_index = list(set([x[1] for x in _new_anno_dict.values()]))
-        _new_df = pd.DataFrame( np.empty((len(self.isotope_index), len(_new_adduct_index)), dtype=np.str),
-                            index=self.isotope_index,
+        _new_df = pd.DataFrame( np.empty((self.khipu_grid.shape[0], len(_new_adduct_index)), 
+                            dtype=np.str),
+                            index=self.khipu_grid.index,
                             columns=_new_adduct_index,
                             dtype=str)
         for k,v in _new_anno_dict.items():
             _new_df.loc[v[0], v[1]] = k
 
         self.khipu_grid = pd.concat([self.khipu_grid, _new_df], axis=1)
-        self.annotation_dict.update(_new_anno_dict)
-        self.adduct_index_labels = list(self.khipu_grid.columns)
+        self.feature_map.update(_new_anno_dict)
+        # self.adduct_index_labels = list(self.khipu_grid.columns)
 
         return [x[1] for x in matched]
 
@@ -574,8 +584,8 @@ class Khipu:
         '''
         (_M, _N) = self.khipu_grid.shape
         abundance_matrix = pd.DataFrame(data=np.zeros(shape=(_M, _N)),
-                            index=self.isotope_index,
-                            columns=self.adduct_index_labels,
+                            index=self.khipu_grid.index,
+                            columns=self.khipu_grid.columns,
         )
         for ii in range(_M):
             for jj in range(_N):
@@ -657,7 +667,7 @@ class Khipu:
         features = []
         for n in self.nodes_to_use:
             try:
-                m, a = self.annotation_dict[n]
+                m, a = self.feature_map[n]
                 ion = self.feature_dict[n]
                 ion['isotope'] = m
                 ion['modification'] = a
@@ -672,7 +682,7 @@ class Khipu:
 
         return {
             'interim_id': id, 
-            'neutral_formula_mass': None,
+            'neutral_formula_mass': self.neutral_mass,
             'neutral_formula': None,
             'Database_referred': [],
             'identity': [],
