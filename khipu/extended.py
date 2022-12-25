@@ -130,7 +130,9 @@ class khipu_diagnosis(Khipu):
 
 # -----------------------------------------------------------------------------
 
-def test_read_file(infile, 
+def local_read_file(infile, 
+                    start_col=3,
+                    end_col=6,
                     isotope_search_patterns=isotope_search_patterns, 
                     adduct_search_patterns=adduct_search_patterns,
                     mz_tolerance_ppm=5,
@@ -139,8 +141,9 @@ def test_read_file(infile,
     ID, m/z, retention_time, intensity.
     Example data at '../testdata/full_Feature_table.tsv'.
     '''
+    print("Working on file ", infile)
     flist = read_features_from_text(open(infile).read(),
-                    id_col=0, mz_col=1, rtime_col=2, intensity_cols=(3,4), delimiter="\t"
+                    id_col=0, mz_col=1, rtime_col=2, intensity_cols=(start_col, end_col), delimiter="\t"
     )
     subnetworks, peak_dict, edge_dict = peaks_to_networks(flist,
                     isotope_search_patterns,
@@ -152,13 +155,15 @@ def test_read_file(infile,
 
 
 def khipu_annotate(args):
-    '''args as from parser.parse_args()
-
+    '''Automated pre-annotation using Khipu on a feature table.
+    args as from parser.parse_args()
     '''
     adduct_patterns = adduct_search_patterns
     if args.mode == 'neg':
         adduct_patterns = adduct_search_patterns_neg
-    subnetworks, peak_dict, edge_dict = test_read_file(infile=args.input,
+    subnetworks, peak_dict, edge_dict = local_read_file(infile=args.input,
+                    start_col=args.start,
+                    end_col=args.end,
                     isotope_search_patterns=isotope_search_patterns, 
                     adduct_search_patterns=adduct_patterns,
                     mz_tolerance_ppm=args.ppm,
@@ -167,9 +172,10 @@ def khipu_annotate(args):
     WV = Weavor(peak_dict, isotope_search_patterns=isotope_search_patterns, 
                 adduct_search_patterns=adduct_patterns, 
                 mz_tolerance_ppm=args.ppm, mode=args.mode)
-    print("\n\n")
+    print("\n")
     print("Initial khipu search grid: ")
     print(WV.mzgrid)
+    print("\n")
 
     khipu_list = peak_dict_to_khipu_list(
         subnetworks, WV, mz_tolerance_ppm=args.ppm,
@@ -193,17 +199,18 @@ def peak_dict_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
     '''
     khipu_list = []
     for g in subnetworks:
-        KP = Khipu(g)
-        KP.build_khipu(WeavorInstance, mz_tolerance_ppm)
-        khipu_list.append(KP)
-        while KP.redundant_nodes and KP.pruned_network and KP.pruned_network.edges():
-            # make sure pruned_network is connected
-            more_subnets = [KP.pruned_network.subgraph(c).copy() 
-                                    for c in nx.connected_components(KP.pruned_network)]
-            for _G in more_subnets:
-                KP = Khipu(_G, isotope_search_patterns, adduct_search_patterns)
-                KP.build_khipu(WeavorInstance, mz_tolerance_ppm)
-                khipu_list.append(KP)
+        if g.number_of_edges() > 0:
+            KP = Khipu(g)
+            KP.build_khipu(WeavorInstance, mz_tolerance_ppm)
+            khipu_list.append(KP)
+            while KP.redundant_nodes and KP.pruned_network and KP.pruned_network.edges():
+                # make sure pruned_network is connected
+                more_subnets = [KP.pruned_network.subgraph(c).copy() 
+                                        for c in nx.connected_components(KP.pruned_network)]
+                for _G in more_subnets:
+                    KP = Khipu(_G, isotope_search_patterns, adduct_search_patterns)
+                    KP.build_khipu(WeavorInstance, mz_tolerance_ppm)
+                    khipu_list.append(KP)
 
     # assign IDs
     ii = 0

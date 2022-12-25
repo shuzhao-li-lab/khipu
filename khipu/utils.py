@@ -26,7 +26,6 @@ adduct_search_patterns_neg = [ (35.9767, 'HCl'),
                             (46.00548, 'HCOOH'),
                             (21.9820, 'Na/H'), 
                             (41.026549, 'ACN'),
-                            (35.9767, 'HCl'),
                             (37.955882, 'K/H'),
                             ]
 
@@ -72,12 +71,12 @@ def make_expected_adduct_index(mode='pos',
         return [(PROTON, 'M+H+'), ] + [(x[0] + PROTON, x[1]) for x in pattern] 
     else:
         # neg base ion as M-H[-]
-        return [-PROTON, 'M-H[-]'] + [(x[0] - PROTON, x[1]) for x in pattern]
+        return [(-PROTON, 'M-H-')] + [(x[0] - PROTON, x[1]) for x in pattern]
 
 
 def read_features_from_text(text_table, 
                         id_col=0, mz_col=1, rtime_col=2, 
-                        intensity_cols=(3,4), delimiter="\t"):
+                        intensity_cols=(3, 6), delimiter="\t"):
     '''
     Read a text feature table into a list of features.
     Input
@@ -100,7 +99,7 @@ def read_features_from_text(text_table,
     header = featureLines[0].split(delimiter)
     num_features = len(featureLines)-1
     # sanity check
-    print("table headers ordered: ", header[mz_col], header[rtime_col])
+    print("table header looks like: ", header[:intensity_cols[1]])
     print("Read %d feature lines" %num_features)
     L = []
     for ii in range(1, num_features+1):

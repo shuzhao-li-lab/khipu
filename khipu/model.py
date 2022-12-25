@@ -75,7 +75,6 @@ class Weavor:
             e = (e[1], e[0], e[2])
             mz1, mz2 = mz2, mz1
 
-        neutral_mass_1 = mz1 - self.adduct_pattern[0][0] # relative to M+H+ or M-H-
         if e[2]['type'] == 'isotope':
             grid = pd.DataFrame( {self.adduct_index[0]: [e[0], e[1]]},
                             index=[self.isotope_index[0], e[2]['tag']], 
@@ -84,19 +83,17 @@ class Weavor:
                 e[0]: (self.isotope_index[0], self.adduct_index[0]), 
                 e[1]: (e[2]['tag'], self.adduct_index[0]),
             }
-            neutral_mass_2 = mz2 - self.isotope_dict[e[2]['tag']]
             
         else:           # adduct
             grid = pd.DataFrame( {self.adduct_index[0]: [e[0]], e[2]['tag']: [e[1]]},
                             index=[self.isotope_index[0],], 
                             dtype=str)
-            neutral_mass_2 = mz2 - self.adduct_dict[e[2]['tag']]
             feature_map = {
                 e[0]: (self.isotope_index[0], self.adduct_index[0]), 
                 e[1]: (self.isotope_index[0], e[2]['tag']),
             }
 
-        neutral_mass = 0.5 * (neutral_mass_1 + neutral_mass_2)
+        neutral_mass = self.regress_neutral_mass(feature_map)
         return neutral_mass, grid, feature_map
 
     def build_branch_only_grid(self, sorted_mz_peak_ids):
@@ -390,9 +387,11 @@ class Khipu:
             elif isotopic_edges :       # branch only single adduct
                 self.neutral_mass, self.khipu_grid, self.feature_map = \
                     WeavorInstance.build_branch_only_grid(self.sorted_mz_peak_ids)
-            else:                       # trunk only, no isotopes
+            elif adduct_edges:          # trunk only, no isotopes
                 self.neutral_mass, self.khipu_grid, self.feature_map = \
                     WeavorInstance.build_trunk_only_grid(adduct_edges)
+            else:
+                print("Empty network - ", self.nodes_to_use, isotopic_edges, adduct_edges, self.input_network.edges(data=True))
             
     def get_pruned_network(self):
         '''Get extra features and edges that are not fit in this khipu.
@@ -437,10 +436,10 @@ class Khipu:
         The extra nodes are not kept, because they can be picked up by extended search later if they fit this Khipu.
         '''
         use_nodes = [
-            (self.feature_dict[n]['representative_intensity'], n) for n in self.input_network.nodes
+            (self.feature_dict[n]['representative_intensity'], n) for n in self.input_network.nodes()
         ]
         use_nodes = sorted(use_nodes, reverse=True)[:self._size_limit_]
-        new_network = self.input_network.subgraph(use_nodes)
+        new_network = self.input_network.subgraph([x[1] for x in use_nodes])
         return new_network
 
     def get_feature_dict(self, peak_dict, mz_tolerance_ppm):

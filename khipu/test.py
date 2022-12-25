@@ -10,10 +10,10 @@ from .extended import *
 from .utils import *
 
 
-def test_read_url(url='https://github.com/shuzhao-li/khipu/raw/main/testdata/full_Feature_table.tsv'):
+def test_read_url(url='https://github.com/shuzhao-li/khipu/raw/main/testdata/ecoli_pos.tsv'):
     print("Retrieving test data from GitHub.")
     data = urllib.request.urlopen(url).read().decode('utf-8')
-    flist = read_features_from_text(data, id_col=0, mz_col=1, rtime_col=2, intensity_cols=(11, 17))
+    flist = read_features_from_text(data, id_col=0, mz_col=1, rtime_col=2, intensity_cols=(3, 9))
     subnetworks, peak_dict, edge_dict = peaks_to_networks(flist,
                         adduct_search_patterns = adduct_search_patterns,
                         isotope_search_patterns = isotope_search_patterns,

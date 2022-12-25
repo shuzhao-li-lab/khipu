@@ -20,6 +20,10 @@ def main():
             help='tolerance of retention time match, arbitrary unit dependent on preprocessing tool')
     parser.add_argument('-i', '--input', 
             help='input file as feature table')
+    parser.add_argument('-s', '--start',  default=3, type=int,
+            help='start column for intensity in input table')
+    parser.add_argument('-e', '--end',  default=6, type=int,
+            help='end column for intensity in input table')
     parser.add_argument('-o', '--output', 
             help='prefix of output files')
 
