@@ -94,7 +94,7 @@ class khipu_diagnosis(Khipu):
     def build_khipu_tree(self):
         peak_dict = self.feature_dict
         tree = treelib.Tree()
-        root_node = int(peak_dict[self.root]['mz']) - 1
+        root_node = str(round(self.neutral_mass, 4))
         tree.create_node(str(root_node), root_node)
         # tree depth = 2, defined by khipu
         for n in self.khipu_grid.columns:
