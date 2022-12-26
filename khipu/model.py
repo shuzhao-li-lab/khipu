@@ -593,6 +593,19 @@ class Khipu:
                                                                 ]['representative_intensity']
         return abundance_matrix
 
+    def get_khipu_mzgrid_print(self):
+        '''Return str m/z matrix as DataFrame in same layout as self.khipu_grid, for visual purpose.
+        '''
+        _new_df = pd.DataFrame( np.empty(self.khipu_grid.shape, 
+                            dtype=np.str),
+                            index=self.khipu_grid.index,
+                            columns=self.khipu_grid.columns,
+                            dtype=str)
+        for k,v in self.feature_map.items():
+            _new_df.loc[v[0], v[1]] = self.feature_dict[k]['mz']
+
+        return _new_df
+
     #---------- export and visual --------------
     def print_khipu(self):
         '''Print khipu using adducts as trunk and isotopes as branches (preferred)
@@ -622,11 +635,7 @@ class Khipu:
         fig, ax = plt.subplots()
         
         for jj in range(_N):
-            # get min m/z per khipu_grid columa
-            _features = [f for f in  self.khipu_grid.iloc[:, jj] if f]
-            _mzs = [self.feature_dict[f]['mz'] for f in _features]
-            _t = str(int(min(_mzs))) + ' ~ ' + df.columns[jj]
-            ax.text(jj, -1, _t, rotation=60)
+            ax.text(jj, -1, df.columns[jj], rotation=60)
             ax.plot([jj]*_M, range(_M), marker='o', linestyle='--', markersize=0.1)
         
         ax.plot([-1, _N+1], [0,0], linestyle='-', linewidth=2, color='k', alpha=0.3)
@@ -638,7 +647,6 @@ class Khipu:
         ax.margins(0.2)
         ax.set_axis_off()
         ax.invert_yaxis()
-        
         #fig.tight_layout()
         plt.show()
 
@@ -693,5 +701,7 @@ class Khipu:
     #---------- shorthand names --------------
     print = print_khipu
     print2 = print_khipu_rotated
+    print3 = get_khipu_mzgrid_print         # dataframe
     plot = plot_khipu_diagram
     plot2 = plot_khipu_diagram_rotated
+    
