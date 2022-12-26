@@ -193,7 +193,7 @@ class Weavor:
         for mz, f in root_corrected_mz_features:
             delta = abs(self.mzgrid - mz)
             if delta.values.min() < mz_error:
-                ii, jj = np.unravel_index( np.argmin(delta), self.mzgrid.shape )
+                ii, jj = np.unravel_index( np.argmin(delta.values), self.mzgrid.shape )
                 feature_map[f] = (self.mzgrid.index[ii], self.mzgrid.columns[jj])
 
         score = len(feature_map)
