@@ -316,23 +316,8 @@ class Khipu:
             ('F3533', 'F20', {'type': 'modification', 'tag': 'Na/H'}), 
             ('F195', 'F20', {'type': 'modification', 'tag': 'Acetonitrile'}), 
             ('F20', 'F53', {'type': 'isotope', 'tag': '13C/12C'}), 
-        
-        self.is_13C_verified = False
-        self.is_singleton = False
-
-        self.isotope_search_patterns = isotope_search_patterns
-        self.adduct_search_patterns = adduct_search_patterns
-
-
-        self.adduct_index = indexed_adducts
-        self.adduct_index_labels = adduct_index_labels
-        self.branch_dict = branch_dict
-
-        self.annotation_dict = {}
-        self.adduct_index = []
-        
-
         '''
+        self.id = ''
         self.input_network = subnetwork
         self.nodes_to_use = []
         self.redundant_nodes = []          # nodes in input_network but not in final khipu
@@ -341,7 +326,6 @@ class Khipu:
         self.khipu_grid = {}                # DataFrame of N x M, M number of isotopes, N number of adducts
                                             # M is explicitly specified during search
                                             # N is dynamically determined on each khipu
-
 
     def build_khipu(self, WeavorInstance, mz_tolerance_ppm=5, check_fitness=False):
         '''Convert a network of two types of edges, isotopic and adduct, to khipu instances of unique nodes.
@@ -617,7 +601,7 @@ class Khipu:
         '''
         print(self.khipu_grid.T)
         
-    def plot_khipu_diagram(self):
+    def plot_khipu_diagram(self, savepdf=''):
         '''Plot the khipu grid as diagram.
         Use MatPlotLib as default engine.
         '''
@@ -633,14 +617,12 @@ class Khipu:
         S = [(np.log10(d[2]+1))**2 for d in zdata]
         
         fig, ax = plt.subplots()
-        
         for jj in range(_N):
             ax.text(jj, -1, df.columns[jj], rotation=60)
             ax.plot([jj]*_M, range(_M), marker='o', linestyle='--', markersize=0.1)
         
         ax.plot([-1, _N+1], [0,0], linestyle='-', linewidth=2, color='k', alpha=0.3)
         ax.scatter(X, Y, c='red', s=S, alpha=0.8)
-        
         for ii in range(_M):
             ax.text(_N+1.6, ii, df.index[ii])
         
@@ -649,6 +631,8 @@ class Khipu:
         ax.invert_yaxis()
         #fig.tight_layout()
         plt.show()
+        if savepdf:
+            plt.savefig(savepdf)
 
     def plot_khipu_diagram_rotated(self):
         pass
