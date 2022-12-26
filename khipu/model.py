@@ -343,14 +343,14 @@ class Khipu:
         self.neutral_mass : inferred neutral mass for the khipu compound
         '''
         self._size_limit_ = WeavorInstance._size    # Set max limit of feature number based on grid size
+        self.feature_dict, self.mzstr_dict = self.get_feature_dict(
+                                        WeavorInstance.peak_dict, mz_tolerance_ppm)
         if self.input_network.number_of_edges() == 1:
             edge = list(self.input_network.edges(data=True))[0]
             self.neutral_mass, self.khipu_grid, self.feature_map =\
                         WeavorInstance.build_simple_pair_grid(edge)
             self.clean_network = self.input_network
             self.nodes_to_use = list(self.clean_network.nodes())
-            self.feature_dict, self.mzstr_dict = self.get_feature_dict(
-                                        WeavorInstance.peak_dict, mz_tolerance_ppm)
 
         else:
             self.clean(WeavorInstance, mz_tolerance_ppm)
