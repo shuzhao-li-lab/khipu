@@ -343,17 +343,19 @@ class Khipu:
         self.neutral_mass : inferred neutral mass for the khipu compound
         '''
         self._size_limit_ = WeavorInstance._size    # Set max limit of feature number based on grid size
-        self.feature_dict, self.mzstr_dict = self.get_feature_dict(WeavorInstance.peak_dict, mz_tolerance_ppm)
-        
         if self.input_network.number_of_edges() == 1:
             edge = list(self.input_network.edges(data=True))[0]
             self.neutral_mass, self.khipu_grid, self.feature_map =\
                         WeavorInstance.build_simple_pair_grid(edge)
             self.clean_network = self.input_network
             self.nodes_to_use = list(self.clean_network.nodes())
+            self.feature_dict, self.mzstr_dict = self.get_feature_dict(
+                                        WeavorInstance.peak_dict, mz_tolerance_ppm)
+
         else:
-            self.clean()
+            self.clean(WeavorInstance, mz_tolerance_ppm)
             self.clean_network = self.input_network.subgraph(self.nodes_to_use)
+            
             isotopic_edges, adduct_edges = [], []
             for e in self.clean_network.edges(data=True):
                 if e[2]['type'] == 'isotope':
@@ -375,7 +377,8 @@ class Khipu:
                 self.neutral_mass, self.khipu_grid, self.feature_map = \
                     WeavorInstance.build_trunk_only_grid(adduct_edges)
             else:
-                print("Empty network - ", self.nodes_to_use, isotopic_edges, adduct_edges, self.input_network.edges(data=True))
+                print("Empty network - ", self.nodes_to_use, isotopic_edges, adduct_edges, 
+                                        self.input_network.edges(data=True))
             
     def get_pruned_network(self):
         '''Get extra features and edges that are not fit in this khipu.
@@ -387,9 +390,19 @@ class Khipu:
         if self.redundant_nodes:
             self.pruned_network = self.input_network.subgraph(self.redundant_nodes)
 
-    def clean(self):
+    def clean(self, WeavorInstance, mz_tolerance_ppm):
         '''Clean up the input subnetwork, only using unique features to build a khipu frame.
         Redundant features are kept aside. The leftover features will be sent off to build new khipus.
+
+        Updates
+        -------
+        self.feature_dict
+        self.mzstr_dict
+        self.median_rtime
+        self.nodes_to_use
+        self.redundant_nodes 
+        self.sorted_mz_peak_ids
+        self.root       # temporary
 
         Notes
         -----
@@ -399,7 +412,7 @@ class Khipu:
         '''
         if self.input_network.number_of_nodes() > self._size_limit_:
             self.input_network = self.down_size()
-
+        self.feature_dict, self.mzstr_dict = self.get_feature_dict(WeavorInstance.peak_dict, mz_tolerance_ppm)
         self.median_rtime = np.median([self.feature_dict[n]['rtime'] for n in self.input_network])
         for k,v in self.mzstr_dict.items():
             # v as list of node IDs
@@ -422,7 +435,9 @@ class Khipu:
         use_nodes = [
             (self.feature_dict[n]['representative_intensity'], n) for n in self.input_network.nodes()
         ]
+        _N = len(use_nodes)
         use_nodes = sorted(use_nodes, reverse=True)[:self._size_limit_]
+        print("Downsized input network with %d features, highest peak at %s " %(_N, use_nodes[0][1]))
         new_network = self.input_network.subgraph([x[1] for x in use_nodes])
         return new_network
 
