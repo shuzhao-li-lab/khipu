@@ -346,7 +346,7 @@ class Khipu:
         self.feature_dict, self.mzstr_dict = self.get_feature_dict(WeavorInstance.peak_dict, mz_tolerance_ppm)
         
         if self.input_network.number_of_edges() == 1:
-            edge = self.input_network.edges(data=True)[0]
+            edge = list(self.input_network.edges(data=True))[0]
             self.neutral_mass, self.khipu_grid, self.feature_map =\
                         WeavorInstance.build_simple_pair_grid(edge)
             self.clean_network = self.input_network

@@ -156,7 +156,10 @@ def local_read_file(infile,
 
 def khipu_annotate(args):
     '''Automated pre-annotation using Khipu on a feature table.
-    args as from parser.parse_args()
+    args as from parser.parse_args().
+
+    One can follow the steps here to construct a custom workflow,
+    using scripting or notebooks.
     '''
     adduct_patterns = adduct_search_patterns
     if args.mode == 'neg':
@@ -177,10 +180,12 @@ def khipu_annotate(args):
     print(WV.mzgrid)
     print("\n")
 
-    khipu_list = peak_dict_to_khipu_list(
+    khipu_list = graphs_to_khipu_list(
         subnetworks, WV, mz_tolerance_ppm=args.ppm,
         )
-    khipu_list, all_assigned_peaks = extend_khipu_list(khipu_list, peak_dict, extended_adducts)
+    khipu_list, all_assigned_peaks = extend_khipu_list(khipu_list, peak_dict, 
+                    extended_adducts, mz_tolerance_ppm=args.ppm,
+                    rt_tolerance=args.rtol)
 
     print("\n\n ~~~~~~ Got %d khipus, with %d features ~~~~~~~ \n\n" 
                 %(len(khipu_list), len(all_assigned_peaks)))
@@ -192,8 +197,40 @@ def khipu_annotate(args):
     with open(outfile, 'w', encoding='utf-8') as f:
         json.dump(empCpds, f, ensure_ascii=False, indent=2)
 
+def peaklist_to_khipu_list(peaklist, 
+                    isotope_search_patterns=isotope_search_patterns, 
+                    adduct_search_patterns=adduct_search_patterns,
+                    mz_tolerance_ppm=5,
+                    rt_tolerance=2, 
+                    mode='pos'):
+    '''A wrapper function easier for local data analysis.
+    peaklist : list of input peaks/features in JSON notion as defined in Khipu or MetDataModel.
+    return khipu_list, all_assigned_peaks
+    '''
+    subnetworks, peak_dict, edge_dict = peaks_to_networks(peaklist,
+                    isotope_search_patterns,
+                    adduct_search_patterns,
+                    mz_tolerance_ppm,
+                    rt_tolerance
+    )
+    WV = Weavor(peak_dict, isotope_search_patterns=isotope_search_patterns, 
+                adduct_search_patterns=adduct_search_patterns, 
+                mz_tolerance_ppm=mz_tolerance_ppm, 
+                mode=mode)
+    print("\n")
+    print("Initial khipu search grid: ")
+    print(WV.mzgrid)
+    print("\n")
+    khipu_list = graphs_to_khipu_list(
+        subnetworks, WV, mz_tolerance_ppm=mz_tolerance_ppm,
+        )
+    khipu_list, all_assigned_peaks = extend_khipu_list(khipu_list, peak_dict, 
+                    extended_adducts, mz_tolerance_ppm=mz_tolerance_ppm,
+                    rt_tolerance=rt_tolerance)
+    return khipu_list, all_assigned_peaks
 
-def peak_dict_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
+
+def graphs_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
     '''Generate full khipu_list from subnetworks, 
     including iterative khipus based on features pruned out of initial subnetwork.
     '''
