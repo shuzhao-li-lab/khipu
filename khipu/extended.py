@@ -153,7 +153,6 @@ def local_read_file(infile,
     )
     return subnetworks, peak_dict, edge_dict
 
-
 def khipu_annotate(args):
     '''Automated pre-annotation using Khipu on a feature table.
     args as from parser.parse_args().
@@ -162,8 +161,11 @@ def khipu_annotate(args):
     using scripting or notebooks.
     '''
     adduct_patterns = adduct_search_patterns
+    delta_mz = PROTON
     if args.mode == 'neg':
         adduct_patterns = adduct_search_patterns_neg
+        delta_mz = -PROTON
+
     subnetworks, peak_dict, edge_dict = local_read_file(infile=args.input,
                     start_col=args.start,
                     end_col=args.end,
@@ -193,9 +195,12 @@ def khipu_annotate(args):
 
     outfile = 'khipu_test_empricalCompounds.json'
     if args.output:
-        outfile = args.output
+        outfile = args.output + '.json'
     with open(outfile, 'w', encoding='utf-8') as f:
         json.dump(empCpds, f, ensure_ascii=False, indent=2)
+
+    singleton_ion = list(WV.mzgrid.columns)[0]
+    export_khipu_table(outfile.replace(".json", ".tsv"), peak_dict, empCpds, singleton_ion, delta_mz)
 
 def peaklist_to_khipu_list(peaklist, 
                     isotope_search_patterns=isotope_search_patterns, 
@@ -229,7 +234,6 @@ def peaklist_to_khipu_list(peaklist,
                     rt_tolerance=rt_tolerance)
     return khipu_list, all_assigned_peaks
 
-
 def graphs_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
     '''Generate full khipu_list from subnetworks, 
     including iterative khipus based on features pruned out of initial subnetwork.
@@ -258,7 +262,6 @@ def graphs_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
 
     return khipu_list
 
-
 def extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended, mz_tolerance_ppm=5, rt_tolerance=2):
     '''Update khipus by extended adduct search.
     Returns updated khipu_list and list_assigned_peaks.
@@ -275,13 +278,11 @@ def extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended, mz
 
     return khipu_list, set(list_assigned_peaks)
 
-
 def export_json_khipu_list(khipu_list):
     J = []
     for KP in khipu_list:
         J.append(KP.export_json())
     return J
-
 
 def export_empCpd_khipu_list(khipu_list):
     '''Export all khipus in khipu_list to a list of empirical compounds, which is JSON compatible.
@@ -293,3 +294,28 @@ def export_empCpd_khipu_list(khipu_list):
     for KP in khipu_list:
         J.append(KP.format_to_epds(id=KP.id))
     return J
+
+def export_khipu_table(outfile, peak_dict, json_khipu_list, singleton_ion='M+H+', delta_mz=1.0073):
+    '''Write tab delimited file of khipu_list.
+    delta_mz is +proton if pos mode, -protone if neg mode, for singletons.
+    '''
+    header = ['id', 'mz', 'rtime', 'interim_id', 'neutral_formula_mass', 'isotope', 'modification', 'ion_relation']
+    s = '\t'.join(header).replace('interim_id', 'empCpd') + '\n'
+    in_khipu_list = []
+    for J in json_khipu_list:
+        for F in J["MS1_pseudo_Spectra"]:
+            in_khipu_list.append(F['id'])
+            s += '\t'.join([
+                F['id'], str(F['mz']), str(F['rtime']), J['interim_id'], str(J['neutral_formula_mass']), 
+                F.get('isotope', ''), F.get('modification', ''), F['ion_relation']
+            ]) + '\n'
+    # other peaks
+    for k,F in peak_dict.items(): 
+        if k not in in_khipu_list:
+            s += '\t'.join([
+                F['id'], str(F['mz']), str(F['rtime']), 'singleton', str(round(F['mz']-delta_mz,4)), 
+                'M0', singleton_ion, ''
+            ]) + '\n'
+
+    with open(outfile, 'w') as f:
+        f.write(s)

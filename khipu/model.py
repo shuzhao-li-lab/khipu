@@ -196,7 +196,6 @@ class Weavor:
 
         return score, feature_map
 
-
     def build_full_grid(self, abstracted_adduct_edges, branch_dict, nodes_to_use):
         '''Build a khipu grid, after the input network is cleaned to isotopic_edges and adduct_edges.
         1) Get isotopic branches first, and treat them each branch as a node. This converts (U, V) to (U, B).
@@ -262,7 +261,6 @@ class Weavor:
 
         return neutral_mass, grid, best_feature_map
 
-
     def make_tree(self):
         tree = treelib.Tree()
         tree.create_node('M', 'M')
@@ -272,7 +270,6 @@ class Weavor:
                 tree.create_node(m, m+node, parent=node)
 
         return tree 
-
 
     #---------- placeholders --------------
     def select_by_fitness(self):
@@ -291,7 +288,6 @@ class Weavor:
         Default to a) is good enough for now.
         '''
         pass
-
 
 
 class Khipu:
@@ -527,7 +523,6 @@ class Khipu:
         -------
         self.feature_map
         self.khipu_grid
-        # self.adduct_index_labels
 
         Returns
         -------
@@ -569,7 +564,6 @@ class Khipu:
 
         self.khipu_grid = pd.concat([self.khipu_grid, _new_df], axis=1)
         self.feature_map.update(_new_anno_dict)
-        # self.adduct_index_labels = list(self.khipu_grid.columns)
 
         return [x[1] for x in matched]
 
@@ -618,20 +612,16 @@ class Khipu:
         '''
         plot_khipugram(self.get_khipu_intensities(), savepdf)
 
-
     def plot_khipu_diagram_rotated(self):
         pass
-
 
     def export_json(self):
         '''Placeholder.
         '''
         return self.khipu_grid.to_json()
 
-
     def export_json_grid_data(self):
         return self.khipu_grid.to_json()
-
 
     def format_to_epds(self, id=''):
         '''Format khipu to empirical compound, with added ion notions.
