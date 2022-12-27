@@ -13,10 +13,6 @@ import treelib
 from scipy.optimize import curve_fit
 from .utils import *
 
-try:
-    import matplotlib.pyplot as plt
-except:
-    print("  matplotlib ImportError.")
 
 class Weavor:
     '''For each experiment, this class sets up a grid of isotopes and adducts,
@@ -620,34 +616,8 @@ class Khipu:
         '''Plot the khipu grid as diagram.
         Use MatPlotLib as default engine.
         '''
-        df = self.get_khipu_intensities()
-        _M, _N = df.shape
-        zdata = []
-        for ii in range(_M):
-            for jj in range(_N):
-                zdata.append((jj, ii, df.iloc[ii, jj]))
-        
-        X = [d[0] for d in zdata]
-        Y = [d[1] for d in zdata]
-        S = [(np.log10(d[2]+1))**2 for d in zdata]
-        
-        fig, ax = plt.subplots()
-        for jj in range(_N):
-            ax.text(jj, -1, df.columns[jj], rotation=60)
-            ax.plot([jj]*_M, range(_M), marker='o', linestyle='--', markersize=0.1)
-        
-        ax.plot([-1, _N+1], [0,0], linestyle='-', linewidth=2, color='k', alpha=0.3)
-        ax.scatter(X, Y, c='red', s=S, alpha=0.8)
-        for ii in range(_M):
-            ax.text(_N+1.6, ii, df.index[ii])
-        
-        ax.margins(0.2)
-        ax.set_axis_off()
-        ax.invert_yaxis()
-        #fig.tight_layout()
-        plt.show()
-        if savepdf:
-            plt.savefig(savepdf)
+        plot_khipugram(self.get_khipu_intensities(), savepdf)
+
 
     def plot_khipu_diagram_rotated(self):
         pass

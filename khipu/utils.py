@@ -7,6 +7,11 @@ import numpy as np
 import networkx as nx
 from mass2chem.search import build_centurion_tree, find_all_matches_centurion_indexed_list
 
+try:
+    import matplotlib.pyplot as plt
+except:
+    print("  matplotlib ImportError.")
+
 #
 # m/z differences corresponding to adducts and isotopes
 # Not using charge in tables, because all m/z diff is relative to other charged ions
@@ -44,11 +49,14 @@ isotope_search_patterns = [ (1.003355, '13C/12C', (0, 0.8)),
                             ]
 
 extended_adducts = [(1.0078, 'H'),
+                            (-1.0078, '-H'),
                             (10.991, 'Na/H, double charged'),
                             (0.5017, '13C/12C, double charged'),
+                            (117.02655, '-NH3'),
                             (17.02655, 'NH3'),
+                            (-18.0106, '-H2O'),
                             (18.0106, 'H2O'),      # easy to confuse with bio reactions
-                            (18.033823, 'M+NH4'),
+                            (18.033823, 'NH4'),
                             (27.01089904, 'HCN'),
                             (37.94694, 'Ca/H2'),
                             (32.026215, 'MeOH'),
@@ -442,6 +450,39 @@ def add_data_to_tag(trees, len_limit=20):
             N.tag += ' ' + str(N.data)[:len_limit]
 
     return trees
+
+def plot_khipugram(df, savepdf=''):
+    '''Plot the khipu grid as diagram.
+    df = KP.get_khipu_intensities()
+    '''
+    _M, _N = df.shape
+    zdata = []
+    for ii in range(_M):
+        for jj in range(_N):
+            zdata.append((jj, ii, df.iloc[ii, jj]))
+
+    X = [d[0] for d in zdata]
+    Y = [d[1] for d in zdata]
+    S = [(np.log10(d[2]+1))**2 for d in zdata]
+
+    fig, ax = plt.subplots()
+    for jj in range(_N):
+        ax.text(jj, -1, df.columns[jj], rotation=60)
+        ax.plot([jj]*_M, range(_M), marker='o', linestyle='--', markersize=0.1)
+
+    ax.plot([-1, _N+1], [0,0], linestyle='-', linewidth=2, color='k', alpha=0.3)
+    ax.scatter(X, Y, c='red', s=S, alpha=0.8)
+    for ii in range(_M):
+        ax.text(_N+1.6, ii, df.index[ii])
+
+    ax.margins(0.2)
+    ax.set_axis_off()
+    ax.invert_yaxis()
+    fig.tight_layout()
+    if savepdf:
+        plt.savefig(savepdf)
+    else:
+        plt.show()
 
 
 def export_json_trees(trees, outfile="export_annoTree.tsv"):
