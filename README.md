@@ -1,6 +1,8 @@
 # khipu as a tree data structure to model a chemical compound in mass spectrometry data
 This applies to regular LC-MS data, but also enables easy analysis of isotope tracing and chemical labeling data.
 
+![khipugram](doc/khipugram.png)
+
 ## Use
 
 Best used as a library for software development or in a JupyterNotebook for data analysis. 

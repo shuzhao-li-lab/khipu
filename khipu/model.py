@@ -629,7 +629,7 @@ class Khipu:
         They are kept in empCpd as "undetermined".
         '''
         if not id:
-            id = 'root@' + self.root
+            id = 'root@' + str(round(self.neutral_mass, 4))
         features = []
         for n in self.nodes_to_use:
             try:
