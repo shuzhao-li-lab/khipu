@@ -67,6 +67,14 @@ extended_adducts = [(1.0078, 'H'),
                             (97.97689507, 'H3PO4'),
 ]
 
+relabel_dict = {
+    'M+H+,Na/H': 'M+Na+',
+    'M+H+,HCl': 'M+HCl+H+',
+    'M+H+,K/H': 'M+K+',
+    'M+H+,ACN': 'M+ACN+H+',
+    'M+H+,NH3': 'M+NH4+',
+    'M+H+,M+H+,Na2/H2': 'M-H+Na+Na+',
+}
 
 def make_expected_adduct_index(mode='pos', 
                                pattern=[(21.9820, 'Na/H'), (41.026549, 'ACN')]):
@@ -451,7 +459,7 @@ def add_data_to_tag(trees, len_limit=20):
 
     return trees
 
-def plot_khipugram(df, savepdf=''):
+def plot_khipugram(df, savepdf='', relabel={}):
     '''Plot the khipu grid as diagram.
     df = KP.get_khipu_intensities()
     The trunk labels are updated here but not in KP instances, because
@@ -471,6 +479,8 @@ def plot_khipugram(df, savepdf=''):
     trunk_labels = list(df.columns)
     _base = trunk_labels[0]
     trunk_labels = [_base] + [_base+","+x for x in trunk_labels[1:]]
+    if relabel:
+        trunk_labels = [relabel.get(x, x) for x in trunk_labels]
 
     fig, ax = plt.subplots()
     for jj in range(_N):
