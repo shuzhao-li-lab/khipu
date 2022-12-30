@@ -454,6 +454,9 @@ def add_data_to_tag(trees, len_limit=20):
 def plot_khipugram(df, savepdf=''):
     '''Plot the khipu grid as diagram.
     df = KP.get_khipu_intensities()
+    The trunk labels are updated here but not in KP instances, because
+    we use the search adduct tables to index m/z distances to M+H+,
+    and it's easier to keep the names consistent with the input tables.  
     '''
     _M, _N = df.shape
     zdata = []
@@ -465,9 +468,13 @@ def plot_khipugram(df, savepdf=''):
     Y = [d[1] for d in zdata]
     S = [(np.log10(d[2]+1))**2 for d in zdata]
 
+    trunk_labels = list(df.columns)
+    _base = trunk_labels[0]
+    trunk_labels = [_base] + [_base+","+x for x in trunk_labels[1:]]
+
     fig, ax = plt.subplots()
     for jj in range(_N):
-        ax.text(jj, -1, df.columns[jj], rotation=60)
+        ax.text(jj, -1, trunk_labels[jj], rotation=60)
         ax.plot([jj]*_M, range(_M), marker='o', linestyle='--', markersize=0.1)
 
     ax.plot([-1, _N+1], [0,0], linestyle='-', linewidth=2, color='k', alpha=0.3)

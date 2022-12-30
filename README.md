@@ -121,7 +121,7 @@ The are removed from the established khipu by clean-up rules, and sent off to fo
 
 Initial grid may look like this:
 
-                    M+H+        NH3       Na/H        HCl        K/H        ACN
+                   M+H[+]   M+NH4[+]   M+Na[+]   M+HCl+H[+]   M+K[+]   M+ACN+H[+]
     M0           1.007276  18.033826  22.989276  36.983976  38.963158  42.033825
     13C/12C      2.010631  19.037181  23.992631  37.987331  39.966513  43.037180
     13C/12C*2    3.013986  20.040536  24.995986  38.990686  40.969868  44.040535
