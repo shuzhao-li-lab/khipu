@@ -1,5 +1,5 @@
 from .model import *
-# from .utils import isotope_search_patterns, adduct_search_patterns, 
+
 
 class khipu_diagnosis(Khipu):
     '''Added diagnostic and exploratory functions to khipu class.
