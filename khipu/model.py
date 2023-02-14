@@ -253,7 +253,7 @@ class Weavor:
         best_feature_map = sorted(list_grid_fits, reverse=True)[0][2]
         neutral_mass = self.regress_neutral_mass(best_feature_map)
 
-        grid = pd.DataFrame( np.empty((self._M, self._N), dtype=np.str),
+        grid = pd.DataFrame( np.empty((self._M, self._N), dtype=str),
                             index=self.mzgrid.index,
                             columns=self.mzgrid.columns,
                             dtype=str)
@@ -556,7 +556,7 @@ class Khipu:
 
         _new_adduct_index = list(set([x[1] for x in _new_anno_dict.values()]))
         _new_df = pd.DataFrame( np.empty((self.khipu_grid.shape[0], len(_new_adduct_index)), 
-                            dtype=np.str),
+                            dtype=str),
                             index=self.khipu_grid.index,
                             columns=_new_adduct_index,
                             dtype=str)
@@ -587,7 +587,7 @@ class Khipu:
         '''Return str m/z matrix as DataFrame in same layout as self.khipu_grid, for visual purpose.
         '''
         _new_df = pd.DataFrame( np.empty(self.khipu_grid.shape, 
-                            dtype=np.str),
+                            dtype=str),
                             index=self.khipu_grid.index,
                             columns=self.khipu_grid.columns,
                             dtype=str)
