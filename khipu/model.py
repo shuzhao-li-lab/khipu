@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import treelib
 from scipy.optimize import curve_fit
+from .plot import plot_khipugram
 from .utils import *
 
 
