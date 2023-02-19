@@ -238,7 +238,7 @@ def graphs_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
     '''Generate full khipu_list from subnetworks, 
     including iterative khipus based on features pruned out of initial subnetwork.
     '''
-    khipu_list = []
+    khipu_list, khipu_list_valid = [], []
     for g in subnetworks:
         if g.number_of_edges() > 0:
             KP = Khipu(g)
@@ -256,11 +256,13 @@ def graphs_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
     # assign IDs
     ii = 0
     for KP in khipu_list:
-        base_mz = str(round(KP.neutral_mass, 4))
-        ii += 1
-        KP.id = 'kp' + str(ii) + "_" + str(base_mz)
+        if KP.valid:
+            base_mz = str(round(KP.neutral_mass, 4))
+            ii += 1
+            KP.id = 'kp' + str(ii) + "_" + str(base_mz)
+            khipu_list_valid.append(KP)
 
-    return khipu_list
+    return khipu_list_valid
 
 def extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended, mz_tolerance_ppm=5, rt_tolerance=2):
     '''Update khipus by extended adduct search.

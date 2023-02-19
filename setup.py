@@ -47,6 +47,7 @@ setup(
 
   python_requires='>=3.7',
 
-
-
+  entry_points = {
+          'console_scripts': ['khipu=khipu.command_line:main'],
+      },
 )

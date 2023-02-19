@@ -311,6 +311,7 @@ class Khipu:
             ('F20', 'F53', {'type': 'isotope', 'tag': '13C/12C'}), 
         '''
         self.id = ''
+        self.valid = True
         self.input_network = subnetwork
         self.nodes_to_use = []
         self.redundant_nodes = []          # nodes in input_network but not in final khipu
@@ -370,6 +371,7 @@ class Khipu:
                 self.neutral_mass, self.khipu_grid, self.feature_map = \
                     WeavorInstance.build_trunk_only_grid(adduct_edges)
             else:
+                self.valid = False
                 print("Empty network - ", self.nodes_to_use, isotopic_edges, adduct_edges, 
                                         self.input_network.edges(data=True))
             
