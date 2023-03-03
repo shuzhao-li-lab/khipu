@@ -6,19 +6,28 @@ This applies to regular LC-MS data, but also enables easy analysis of isotope tr
 
 ![khipugram](doc/khipugram.png)
 
+## Implementation overview
+Khipu is developed as an open source Python 3 package, and available to install from the standard PyPi repository via the pip tool. It is freely available on GitHub (https://github.com/shuzhao-li/khipu) under a BSD 3-Clause License. The graph operations are supported by the networkx library, tree visualization aided by the treelib library. Khipu uses our package mass2chem for search functions. The data model of “empirical compound” is described in the metDataModel package. The package is designed in a modular way to encourage reuse.
+
+The classes of Weavor and Khipu contain main algorithms, supported by numerous utility functions. All functions are documented in the source via docstrings. Examples of reuse are given in wrapper functions and in Jupyter notebooks. It can be run as a standalone command line tool. Users can use a feature table from any preprocessing tool as input and get annotated empirical compounds in JSON and tab delimited formats.
+
 ## Installation and Use
-Install as a package:
+Install as a package (some systems may require pip3):
+
     pip install khipu-metabolomics
 
 Run as a command line tool after installation:
+
     khipu -i testdata/ecoli_pos.tsv -o this_test
 
 This will output pre-annotation to two files of JSON and tab delimited formats, this_test.json and this_test.tsv.
 
 Run from source code:
+
     python3 -m khipu.main -i testdata/ecoli_pos.tsv -o this_test
 
 Run test:
+
     python3 -m khipu.test
     (This downloads and uses test data from GitHub.)
 
@@ -26,13 +35,10 @@ Best used as a library for software development or in a JupyterNotebook for data
 
 ## Demo notebooks
 We have provided multiple demo notebooks under
+
     notebooks/
 
 They include algorithm demostrations, data analysis examples, use of custom isotope and adduct patterns.
-
-## Implementation overview
-Khipu is developed as an open source Python 3 package, and available to install from the standard PyPi repository via the pip tool. It is freely available on GitHub (https://github.com/shuzhao-li/khipu) under a BSD 3-Clause License. The graph operations are supported by the networkx library, tree visualization aided by the treelib library. Khipu uses our package mass2chem for search functions. The data model of “empirical compound” is described in the metDataModel package. The package is designed in a modular way to encourage reuse.
-The classes of Weavor and Khipu contain main algorithms, supported by numerous utility functions. All functions are documented in the source via docstrings. Examples of reuse are given in wrapper functions and in Jupyter notebooks. It can be run as a standalone command line tool. Users can use a feature table from any preprocessing tool as input and get annotated empirical compounds in JSON and tab delimited formats.
 
 ## Algorithm overview 
 1. Start with an initial list of isotope patterns and adduct patterns (see khipu grid below). Search feature list to get all pairs that match any of the pattern. The initial adduct patterns are trimmed to reduce ambiguity. 
