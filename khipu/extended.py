@@ -1,5 +1,8 @@
-from .model import *
+'''
+To-do: add extended_adducts to function arguments.
+'''
 
+from .model import *
 
 class khipu_diagnosis(Khipu):
     '''Added diagnostic and exploratory functions to khipu class.
@@ -205,6 +208,7 @@ def khipu_annotate(args):
 def peaklist_to_khipu_list(peaklist, 
                     isotope_search_patterns=isotope_search_patterns, 
                     adduct_search_patterns=adduct_search_patterns,
+
                     mz_tolerance_ppm=5,
                     rt_tolerance=2, 
                     mode='pos'):
