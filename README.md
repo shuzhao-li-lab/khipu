@@ -31,7 +31,7 @@ Run test:
     python3 -m khipu.test
     (This downloads and uses test data from GitHub.)
 
-Best used as a library for software development or in a JupyterNotebook for data analysis. 
+Best used as a library for software development or in a Jupyter Notebook for data analysis. 
 
 ## Demo notebooks
 We have provided multiple demo notebooks under
@@ -49,14 +49,15 @@ They include algorithm demostrations, data analysis examples, use of custom isot
 
 4. This library supports tree and grid visualization in plain text. Once imported to a Jupyter Notebook, one can use enhanced visualization schemes. 
 
-5. The library can also be used by others for extended tools. Our data processign tool, asari, uses khipu for preannotation. Additional documentation, more fore developers, is provided under `doc/`.
+5. The library can also be used by others for extended tools. Our data processing tool, asari, uses khipu for preannotation. Additional documentation, more for developers, is provided under `doc/`.
 
 ## Assignment of ion species in a khipu to grid
 1. Separate isotope edges and adduct edges.
 2. The isotope edges form their own groups by shared nodes, each group belong to one adduct type. Each group of connected isotope edges is treated as one "branch".
 3. Establish a "trunk" of adducts with a root and a path for adducts, by optimizing the number of nodes explained.
-4. Asssign each isotopic branch to the adduct trunk.
+4. Assign each isotopic branch to the adduct trunk.
 5. Re-align isotopes in all branches to establish optimal match to the khipu grid. 
+6. Based on available ions and the theoretical "khipu grid", the neutral mass can be obtained via linear regression. 
 
 Some ions may come into the initial network by mistakes or unresolved signals.
 The are removed from the established khipu, and sent off to form a new khipu.
@@ -78,7 +79,7 @@ This can be extended by searching for additional ions. But the core construction
 ## Applicable to isotope tracing
 The search pattern for isotopes is often dependent on the biochemical experiment.
 Users can overwrite the default by supplying their search patterns (see demo notebooks).
-Search patterns are separate from search functions, lending flexibiliy to data analysis.
+Search patterns are separate from search functions, lending flexibility to data analysis.
 
 The next step is to apply Khipu to chemical derivatization experiments.
 In chemical derivatization experiments, the origin compound and derivatized compound can be both measured in the LC-MS data.
