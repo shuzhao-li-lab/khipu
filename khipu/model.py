@@ -211,6 +211,12 @@ class Weavor:
             A node here can be a feature or a branch, which is a list of isotopes.
         branch_dict : dictionary, branch ID to member features/nodes.
 
+        Returns
+        -------
+        neutral_mass : inferred neutral mass by linear regression
+        grid : dataframe of features, coordinates as adduct/isotope
+        best_feature_map : optimal feature map as dict, {feature_id: (isotope_index, adduct_index), ...}
+
         Notes
         -----
         We don't know the real root to start with, and can't assume the lowest m/z is M+H+ or M-H-.
@@ -314,6 +320,7 @@ class Khipu:
         self.valid = True
         self.input_network = subnetwork
         self.nodes_to_use = []
+        self.feature_map = {}
         self.redundant_nodes = []          # nodes in input_network but not in final khipu
         self.pruned_network = None
         self.exceptions = []
@@ -375,15 +382,23 @@ class Khipu:
                 print("Empty network - ", self.nodes_to_use, isotopic_edges, adduct_edges, 
                                         self.input_network.edges(data=True))
             
+        if self.feature_map:
+            self.get_pruned_network()
+
+
     def get_pruned_network(self):
         '''Get extra features and edges that are not fit in this khipu.
-        Updates:
+        Updates
+        -------
         self.redundant_nodes
         self.pruned_network
+        self.nodes_to_use
         '''
-        self.redundant_nodes = [n for n in self.nodes_to_use if n not in self.feature_map]
+        _used_nodes = set(self.feature_map.keys())
+        self.redundant_nodes += [n for n in self.nodes_to_use if n not in _used_nodes]
         if self.redundant_nodes:
             self.pruned_network = self.input_network.subgraph(self.redundant_nodes)
+        self.nodes_to_use = _used_nodes
 
     def clean(self, WeavorInstance, mz_tolerance_ppm):
         '''Clean up the input subnetwork, only using unique features to build a khipu frame.

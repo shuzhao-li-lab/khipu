@@ -253,7 +253,7 @@ def graphs_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
                 more_subnets = [KP.pruned_network.subgraph(c).copy() 
                                         for c in nx.connected_components(KP.pruned_network)]
                 for _G in more_subnets:
-                    KP = Khipu(_G, isotope_search_patterns, adduct_search_patterns)
+                    KP = Khipu(_G)
                     KP.build_khipu(WeavorInstance, mz_tolerance_ppm)
                     khipu_list.append(KP)
 
@@ -268,7 +268,8 @@ def graphs_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
 
     return khipu_list_valid
 
-def extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended, mz_tolerance_ppm=5, rt_tolerance=2):
+def extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended, 
+                      mz_tolerance_ppm=5, rt_tolerance=2):
     '''Update khipus by extended adduct search.
     Returns updated khipu_list and list_assigned_peaks.
     '''
