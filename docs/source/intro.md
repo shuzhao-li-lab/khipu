@@ -1,5 +1,7 @@
 # Introduction
 
+[![Documentation Status](https://readthedocs.org/projects/khipu/badge/?version=latest)](https://khipu.readthedocs.io/en/latest/?badge=latest)
+
 Pre-annotation tool to annotate degenerate ions in relationships to the original compound and infer neutral mass. 
 
 This applies to regular LC-MS data, but also enables easy analysis of isotope tracing and chemical labeling data.

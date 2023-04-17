@@ -6,6 +6,10 @@
 Welcome to khipu's documentation!
 =================================
 
+.. image:: https://readthedocs.org/projects/khipu/badge/?version=latest
+    :target: https://khipu.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
+
 .. toctree::
    :maxdepth: 2
    :numbered:
