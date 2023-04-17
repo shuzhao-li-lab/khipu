@@ -60,9 +60,3 @@ if on_rtd:
 else:
     # html_theme = 'default'
     html_theme = 'sphinx_rtd_theme'
-
-
-from recommonmark.transform import AutoStructify
-
-def setup(app):
-    app.add_transform(AutoStructify)
