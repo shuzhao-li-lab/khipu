@@ -37,7 +37,6 @@ extensions = [
     'myst_parser',
 ]
 
-napoleon_numpy_docstring = True
 napoleon_custom_sections = [('Updates','params_style'),('Input','params_style')]
 
 
