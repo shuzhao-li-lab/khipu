@@ -10,6 +10,7 @@ Welcome to khipu's documentation!
    :maxdepth: 2
    :numbered:
 
+   intro
    modules
 
 

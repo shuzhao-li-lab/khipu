@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.abspath(dir_path))
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'khipu'
-copyright = '2023, Shuzhao Li'
+copyright = '2023, Shuzhao Li, Shujian Zheng'
 author = 'Shuzhao Li'
 release = '0.6.0'
 
@@ -33,7 +33,8 @@ extensions = [
     'sphinx.ext.coverage',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
-    'sphinx.ext.imgconverter'
+    'sphinx.ext.imgconverter',
+    'myst_parser',
 ]
 
 napoleon_numpy_docstring = True
@@ -44,6 +45,8 @@ napoleon_custom_sections = [('Updates','params_style'),('Input','params_style')]
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+source_suffix = ['.rst', '.md']
+
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -51,4 +54,15 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 # html_theme = 'alabaster'
 # html_static_path = ['_static']
-html_theme = 'sphinx_rtd_theme'
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+if on_rtd:
+    html_theme = 'default'
+else:
+    # html_theme = 'default'
+    html_theme = 'sphinx_rtd_theme'
+
+
+from recommonmark.transform import AutoStructify
+
+def setup(app):
+    app.add_transform(AutoStructify)
