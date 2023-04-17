@@ -1,8 +1,8 @@
 matplotlib
-numpy>=1.24.2
-pandas>=1.5.3
-treelib>=1.6.1
-scipy>=1.10.1
-networkx>=3.0
-mass2chem>=0.4.4
-setuptools>=67.5.1
+numpy
+pandas
+treelib
+scipy
+networkx
+mass2chem
+setuptools
