@@ -1,3 +1,11 @@
 sphinx
 sphinx-rtd-theme
 myst_parser
+matplotlib
+numpy
+pandas
+treelib
+scipy
+networkx
+mass2chem
+setuptools
