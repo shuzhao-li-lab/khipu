@@ -199,32 +199,36 @@ class Weavor:
 
     def build_full_grid(self, abstracted_adduct_edges, branch_dict, nodes_to_use):
         '''Build a khipu grid, after the input network is cleaned to isotopic_edges and adduct_edges.
-        1) Get isotopic branches first, and treat them each branch as a node. This converts (U, V) to (U, B).
-            Done in Khipu.branch_abstraction().
+        
+        1) Get isotopic branches first, and treat them each branch as a node. This converts (U, V) to (U, B). Done in Khipu.branch_abstraction().
         2) Get optimal order of abstracted adduct_edges. Done in Weavor.trunk_solver(), by topology not involving m/z. 
         3) Generate grids starting from the smallest m/z in each branch. Get the grid of best feature map.
         4) Use the optimal feature map to set grids.
 
         Parameters
         ----------
-        abstracted_adduct_edges : list of nonredundant directed edges with data tag.
-            A node here can be a feature or a branch, which is a list of isotopes.
-        branch_dict : dictionary, branch ID to member features/nodes.
+            abstracted_adduct_edges
+                list of nonredundant directed edges with data tag.
+                A node here can be a feature or a branch, which is a list of isotopes.
+            branch_dict
+                dictionary, branch ID to member features/nodes.
 
         Returns
         -------
-        neutral_mass : inferred neutral mass by linear regression
-        grid : dataframe of features, coordinates as adduct/isotope
-        best_feature_map : optimal feature map as dict, {feature_id: (isotope_index, adduct_index), ...}
+            neutral_mass
+                inferred neutral mass by linear regression
+            grid
+                dataframe of features, coordinates as adduct/isotope
+            best_feature_map
+                optimal feature map as dict, {feature_id: (isotope_index, adduct_index), ...}
 
-        Notes
-        -----
-        We don't know the real root to start with, and can't assume the lowest m/z is M+H+ or M-H-.
-        The root should be inferred from best overall pattern match.
-        A pseudo-root is not necessarily M0, which may not be detected in perfect labeling experiments.
+        Note:
+            We don't know the real root to start with, and can't assume the lowest m/z is M+H+ or M-H-.
+            The root should be inferred from best overall pattern match.
+            A pseudo-root is not necessarily M0, which may not be detected in perfect labeling experiments.
 
-        Enforce unique node per grid, by best rtime with future option of a fitness function (Khipu.clean()). 
-        Extra nodes go to a new khipu.
+            Enforce unique node per grid, by best rtime with future option of a fitness function (Khipu.clean()). 
+            Extra nodes go to a new khipu.
         '''
         mz_features = [(self.peak_dict[f]['mz'], f) for f in nodes_to_use]
         root, edges = self.trunk_solver(abstracted_adduct_edges, branch_dict)
@@ -335,8 +339,8 @@ class Khipu:
 
         WeavorInstance : Weavor instance to solve the grid.
         check_fitness : if True, chech if replacing with any redundant nodes improves fitness. 
-            This is a placeholder as a good fitness function is not easy to implement and it slows down computing.
-            Future use can be if check_fitness: self.select_by_fitness()
+        This is a placeholder as a good fitness function is not easy to implement and it slows down computing.
+        Future use can be if check_fitness: self.select_by_fitness()
 
         Updates
         -------
@@ -388,6 +392,7 @@ class Khipu:
 
     def get_pruned_network(self):
         '''Get extra features and edges that are not fit in this khipu.
+        
         Updates
         -------
         self.redundant_nodes
@@ -414,11 +419,11 @@ class Khipu:
         self.sorted_mz_peak_ids
         self.root       # temporary
 
-        Notes
-        -----
-        Note: mzstr_dict can be problematic in data that were not processed well, 
-        because minor potential shift can confuse ion relations.
-        This clean() may cut some initial edges.
+        
+        Note: 
+            mzstr_dict can be problematic in data that were not processed well, 
+            because minor potential shift can confuse ion relations.
+            This clean() may cut some initial edges.
         '''
         if self.input_network.number_of_nodes() > self._size_limit_:
             self.input_network = self.down_size()
@@ -493,14 +498,15 @@ class Khipu:
         
         Returns
         -------
-        abstracted_adduct_edges : list of nonredundant directed edges with data tag
-        branch_dict : dictionary, branch ID to member features/nodes.
+            abstracted_adduct_edges
+                list of nonredundant directed edges with data tag
+            branch_dict
+                dictionary, branch ID to member features/nodes.
 
-        Notes
-        -----
-        Membership of B-nodes is returned as branch_dict, which is needed to realign to khipu grid.
-        Without branch constraint, the grid realignment is error prone.
-        Not checking if abstracted_adduct_edges are fully connected.
+        Note:
+            Membership of B-nodes is returned as branch_dict, which is needed to realign to khipu grid.
+            Without branch constraint, the grid realignment is error prone.
+            Not checking if abstracted_adduct_edges are fully connected.
         '''
         G = nx.Graph(isotopic_edges)
         subnetworks = [G.subgraph(c).copy() for c in nx.connected_components(G)]
@@ -546,9 +552,9 @@ class Khipu:
         -------
         added_peaks
 
-        Notes
-        -----
-        annotation_dict may have fewer nodes than nodes_to_use, but is preferred here for cleaner results.
+        
+        Note:
+            annotation_dict may have fewer nodes than nodes_to_use, but is preferred here for cleaner results.
         '''
         matched, _new_anno_dict = [], {}
         for n, v in self.feature_map.items():

@@ -16,13 +16,15 @@ class khipu_diagnosis(Khipu):
 
     def build_diagnostic_tree(self, input_network, depth_limit = 10):
         '''Build diagnostic tree using input nodes.
-
+        
         Updates
         -------
         self.diagnostic_tree as an instance of treelib.Tree.
 
-        Examples (tree here is diagnostic_tree)
+        Examples 
         --------
+        (tree here is diagnostic_tree)
+
         >>> KP = model.khipu()
         >>> KP.build_tree(big[0], peak_dict, edge_dict)
         >>> 
@@ -50,9 +52,8 @@ class khipu_diagnosis(Khipu):
                 ├── 124.0943@110.8
                 └── 125.0976@110.6
 
-        Notes
-        -----
-        A minimum_spanning_tree will have all necessary patterns to cover full khipu, but not unique pattern.
+        Note:
+            A minimum_spanning_tree will have all necessary patterns to cover full khipu, but not unique pattern.
         '''
         T = nx.minimum_spanning_tree(input_network)
         peak_dict = self.feature_dict
