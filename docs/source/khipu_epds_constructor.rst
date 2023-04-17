@@ -3,7 +3,7 @@
 .. default-domain:: py
 
 khipu ecompounds constructor
-======================
+============================
 
 .. automodule:: khipu.epdsConstructor
 
