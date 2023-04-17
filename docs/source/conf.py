@@ -34,6 +34,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx.ext.imgconverter',
+    'myst_parser',
 ]
 
 napoleon_numpy_docstring = True
