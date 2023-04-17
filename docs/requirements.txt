@@ -1,3 +1,6 @@
+sphinx
+sphinx-rtd-theme
+myst_parser
 matplotlib
 numpy
 pandas
