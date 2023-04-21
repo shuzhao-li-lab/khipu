@@ -1,5 +1,9 @@
 # khipu: generalized tree structure to annotate untargeted metabolomics and stable isotope tracing data
 
+[![Documentation Status](https://readthedocs.org/projects/khipu/badge/?version=latest)](https://khipu.readthedocs.io/en/latest/?badge=latest)
+[![DOI](https://img.shields.io/badge/DOI-doi%2F10.1021%2Facs.analchem.2c05810-blue)](https://pubs.acs.org/doi/10.1021/acs.analchem.2c05810)
+
+
 Pre-annotation tool to annotate degenerate ions in relationships to the original compound and infer neutral mass. 
 
 This applies to regular LC-MS data, but also enables easy analysis of isotope tracing and chemical labeling data.
