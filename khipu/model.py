@@ -6,7 +6,7 @@ Weavor is constructed once and provides the main algorithms and functions;
 Khipu is mainlty the data structures and built as one instance per emprical compound.
 So from one experiment/feature table, one may get 10**3 khipus.
 '''
-
+import logging
 import numpy as np
 import pandas as pd
 import treelib
@@ -383,8 +383,12 @@ class Khipu:
                     WeavorInstance.build_trunk_only_grid(adduct_edges)
             else:
                 self.valid = False
-                print("Empty network - ", self.nodes_to_use, isotopic_edges, adduct_edges, 
-                                        self.input_network.edges(data=True))
+                logging.info(
+                    '\t'.join([str(x) for x in [
+                        "Empty network - ", self.nodes_to_use, isotopic_edges, adduct_edges, 
+                                        self.input_network.edges(data=True)
+                    ]])
+                )
             
         if self.feature_map:
             self.get_pruned_network()

@@ -7,6 +7,8 @@ import numpy as np
 import networkx as nx
 from mass2chem.search import build_centurion_tree, find_all_matches_centurion_indexed_list
 
+import logging
+logging.basicConfig(filename='khipu.log', level=logging.INFO)   #  encoding='utf-8',
 
 #
 # m/z differences corresponding to adducts and isotopes
@@ -119,7 +121,7 @@ def read_features_from_text(text_table,
     header = featureLines[0].split(delimiter)
     num_features = len(featureLines)-1
     # sanity check
-    print("table header looks like: ", header[:intensity_cols[1]])
+    print("table header looks like: \n  ", header[:intensity_cols[1]])
     print("Read %d feature lines" %num_features)
     L = []
     for ii in range(1, num_features+1):
@@ -428,7 +430,7 @@ def realign_isotopes(sorted_mz_peak_ids, isotope_search_patterns, mz_tolerance=0
         match = get_isotope_pattern_name(p[0] - M0[0], isotope_search_patterns, mz_tolerance)
         if match == 'Unknown':
             # _d["? " + p[1]] = p[1]
-            print("Unknown isotope match ~ ", p)
+            logging.info("Unknown isotope match ~ " + str(p))
         else:
             _d[match] = p[1]
 
@@ -470,7 +472,7 @@ def get_isotope_pattern_name(mz, isotope_search_patterns, mz_tolerance=0.01):
     '''
     L = sorted([(abs(mz-x[0]), x[1]) for x in isotope_search_patterns])
     if L[0][0] > mz_tolerance:
-        print("Warning no match in isotope_pattern: ", mz)
+        logging.info("Warning no match in isotope_pattern: " + str(mz))
         return 'Unknown'
     else:
         return L[0][1]
