@@ -21,10 +21,12 @@ class Weavor:
     '''
     def __init__(self, peak_dict, 
                 isotope_search_patterns, adduct_search_patterns, 
-                mz_tolerance_ppm=5, mode='pos'):
+                mz_tolerance_ppm=5, mode='pos', charge=1, parent_masstrack=False):
         '''Initiate mzgrid and indices.        
         '''
         self.mode = mode
+        self.charge = charge
+        self.parent_masstrack = parent_masstrack                          # parent_masstrack from asari 
         self.mz_tolerance_ppm = mz_tolerance_ppm
         self.peak_dict = peak_dict
         self.isotope_search_patterns  = sorted(isotope_search_patterns)   # m/z sort search patterns
@@ -51,7 +53,8 @@ class Weavor:
         for x in self.isotope_search_patterns:
             self.isotope_dict[x[1]] = x[0]
 
-        self.adduct_pattern = make_expected_adduct_index(self.mode, self.adduct_search_patterns)
+        self.adduct_pattern = make_expected_adduct_index(
+            self.mode, self.adduct_search_patterns, self.charge)
         # [(PRONTON, M+H+), ..., (42.0338, ACN), ...]
         self.adduct_index = [A[1] for A in self.adduct_pattern]
         for A in self.adduct_pattern:
@@ -130,7 +133,7 @@ class Weavor:
     def regress_neutral_mass(self, feature_map):
         '''Get neutral mass by regression on mapped features.
         feature_map : {feature_id: (isotope_index, adduct_index)}
-        return 
+        Returns inferred neutral mass.
         '''
         def _func(x, neu):
             return x + neu
@@ -138,7 +141,7 @@ class Weavor:
         Y = [self.peak_dict[f]['mz'] for f in fixed_feature_list]
         X = [self.mzgrid.at[feature_map[f][0], feature_map[f][1]] for f in fixed_feature_list]
         popt, _ = curve_fit(_func, X, Y)
-        neutral_mass = popt[0]
+        neutral_mass = popt[0] * self.charge
         return neutral_mass
 
     def trunk_solver(self, adduct_edges, branch_dict={}):
@@ -348,8 +351,12 @@ class Khipu:
         self.neutral_mass : inferred neutral mass for the khipu compound
         '''
         self._size_limit_ = WeavorInstance._size    # Set max limit of feature number based on grid size
+        self.charge = WeavorInstance.charge
         self.feature_dict, self.mzstr_dict = self.get_feature_dict(
-                                        WeavorInstance.peak_dict, mz_tolerance_ppm)
+                                        WeavorInstance.peak_dict, 
+                                        mz_tolerance_ppm,
+                                        WeavorInstance.parent_masstrack
+                                        )
         if self.input_network.number_of_edges() == 1:
             edge = list(self.input_network.edges(data=True))[0]
             self.neutral_mass, self.khipu_grid, self.feature_map =\
@@ -431,7 +438,10 @@ class Khipu:
         '''
         if self.input_network.number_of_nodes() > self._size_limit_:
             self.input_network = self.down_size()
-        self.feature_dict, self.mzstr_dict = self.get_feature_dict(WeavorInstance.peak_dict, mz_tolerance_ppm)
+        self.feature_dict, self.mzstr_dict = self.get_feature_dict(WeavorInstance.peak_dict, 
+                                                                   mz_tolerance_ppm,
+                                                                   WeavorInstance.parent_masstrack
+                                                                   )
         self.median_rtime = np.median([self.feature_dict[n]['rtime'] for n in self.input_network])
         for k,v in self.mzstr_dict.items():
             # v as list of node IDs
@@ -460,7 +470,7 @@ class Khipu:
         new_network = self.input_network.subgraph([x[1] for x in use_nodes])
         return new_network
 
-    def get_feature_dict(self, peak_dict, mz_tolerance_ppm):
+    def get_feature_dict(self, peak_dict, mz_tolerance_ppm, has_parent_masstrack):
         '''Index all input features; establish str identifier for features of same/close m/z values.
         Base on asari mass track IDs; keep unique m/z only.
         It's more efficient to use, since feature_dict is much smaller than peak_dict.
@@ -479,7 +489,8 @@ class Khipu:
         feature_dict, mzstr_dict = {}, {}
         for n in self.input_network.nodes():
             feature_dict[n] = peak_dict[n]
-        if 'parent_masstrack_id' not in feature_dict[n]:
+
+        if not has_parent_masstrack:
             feature_dict = assign_masstrack_ids_in_khipu(feature_dict, mz_tolerance_ppm)
 
         for n,v in feature_dict.items():
@@ -554,7 +565,7 @@ class Khipu:
 
         Returns
         -------
-        added_peaks
+        added_peaks : list of peak ids
 
         
         Note:

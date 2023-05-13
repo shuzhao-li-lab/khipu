@@ -20,13 +20,15 @@ class epdsConstructor:
     To-dos:
         add support of user input formats where rtime isn't precise or unavailable.
         add options of coelution_function (see mass2chem.epdsConstructor )
+        Future consideration: explicitly model resolved and unresolved mass values (e.g. 34S vs 37Cl).
     '''
     def __init__(self, peak_list, mode='pos'):
         '''
         Parameters
         ----------
-        peak_list : [{'parent_masstrace_id': 1670, 'mz': 133.09702315984987, 'rtime': 654, 'height': 14388.0, 'id': 555}, ...]
-        mz_tolerance_ppm: ppm tolerance in examining m/z patterns.
+        peak_list : [{'parent_masstrace_id': 1670, 'mz': 133.09702315984987, 
+            'rtime': 654, 'height': 14388.0, 'id': 555}, ...]
+        mz_tolerance_ppm : ppm tolerance in examining m/z patterns.
         '''
         self.mode = mode
         self.peak_list = peak_list
@@ -37,6 +39,8 @@ class epdsConstructor:
                         extended_adducts,
                         mz_tolerance_ppm,
                         rt_tolerance=2,
+                        charges=[1, 2, 3],
+                        has_parent_masstrack=True,
         ):
         '''
         Parameters
@@ -66,27 +70,16 @@ class epdsConstructor:
         epdDict : A dictionary of empCpds (empirical compounds) indexed by IDs ('interim_id').
                 Not including singletons.
         '''
-        subnetworks, peak_dict, _ = peaks_to_networks(self.peak_list,
-                    isotope_search_patterns,
-                    adduct_search_patterns,
-                    mz_tolerance_ppm,
-                    rt_tolerance
-        )
-        WV = Weavor(peak_dict, isotope_search_patterns=isotope_search_patterns, 
-                    adduct_search_patterns=adduct_search_patterns, 
-                    mz_tolerance_ppm=mz_tolerance_ppm, mode=self.mode)
-        print("\n")
-        print("Initial khipu search grid: ")
-        print(WV.mzgrid)
-        print("\n")
-
-        khipu_list = graphs_to_khipu_list(
-            subnetworks, WV, mz_tolerance_ppm=mz_tolerance_ppm,
-            )
-        khipu_list, all_assigned_peaks = extend_khipu_list(khipu_list, peak_dict, 
-                        extended_adducts, mz_tolerance_ppm=mz_tolerance_ppm,
-                        rt_tolerance=rt_tolerance)
-
+        khipu_list, all_assigned_peaks = peaklist_to_khipu_list(self.peak_list, 
+                    isotope_search_patterns=isotope_search_patterns, 
+                    adduct_search_patterns=adduct_search_patterns,
+                    extended_adducts=extended_adducts,
+                    mz_tolerance_ppm=mz_tolerance_ppm,
+                    rt_tolerance=rt_tolerance,
+                    mode=self.mode,
+                    charges=charges,
+                    has_parent_masstrack=has_parent_masstrack,
+                    )
         print("\n\n ~~~~~~ Got %d khipus, with %d features ~~~~~~~ \n\n" 
                     %(len(khipu_list), len(all_assigned_peaks)))
         empCpds = export_empCpd_khipu_list(khipu_list)

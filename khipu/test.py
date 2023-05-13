@@ -96,7 +96,7 @@ def test1():
     khipu_list = graphs_to_khipu_list(
         subnetworks, WV, mz_tolerance_ppm=5)
     
-    # khipu_list = extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended)
+    # khipu_list = extend_khipu_list(khipu_list, peaks, adduct_search_patterns_extended)
     print("\n\n ~~~~~~ Got %d khipus ~~~~~~~ \n\n" %len(khipu_list))
     empCpds = export_empCpd_khipu_list(khipu_list)
 
@@ -124,7 +124,9 @@ def test2(mz_tolerance_ppm = 5, mode = 'pos'):
                         adduct_patterns,
                         extended_adducts,
                         mz_tolerance_ppm,
-                        # rt_tolerance,
+                        rt_tolerance=2,
+                        charges=[1, 2, 3],
+                        has_parent_masstrack=False,
         ) 
     outfile = 'khipu_test2.json'
     with open(outfile, 'w', encoding='utf-8') as f:

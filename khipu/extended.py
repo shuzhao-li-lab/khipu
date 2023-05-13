@@ -134,28 +134,17 @@ class khipu_diagnosis(Khipu):
 
 # -----------------------------------------------------------------------------
 
-def local_read_file(infile, 
-                    start_col=3,
-                    end_col=6,
-                    isotope_search_patterns=isotope_search_patterns, 
-                    adduct_search_patterns=adduct_search_patterns,
-                    mz_tolerance_ppm=5,
-                    rt_tolerance=2, ):
+def local_read_file(infile, start_col=3, end_col=6):
     '''The input feature table must be a tab delimited file, with the first four columns as:
     ID, m/z, retention_time, intensity.
     Example data at '../testdata/full_Feature_table.tsv'.
+    Returns peaklist
     '''
     print("Working on file ", infile)
-    flist = read_features_from_text(open(infile).read(),
+    peaklist = read_features_from_text(open(infile).read(),
                     id_col=0, mz_col=1, rtime_col=2, intensity_cols=(start_col, end_col), delimiter="\t"
     )
-    subnetworks, peak_dict, edge_dict = peaks_to_networks(flist,
-                    isotope_search_patterns,
-                    adduct_search_patterns,
-                    mz_tolerance_ppm,
-                    rt_tolerance
-    )
-    return subnetworks, peak_dict, edge_dict
+    return peaklist
 
 def khipu_annotate(args):
     '''Automated pre-annotation using Khipu on a feature table.
@@ -163,37 +152,31 @@ def khipu_annotate(args):
 
     One can follow the steps here to construct a custom workflow,
     using scripting or notebooks.
+
+    See also:
+        epdsConstructor.epdsConstructor for similar but embedded workflow.
     '''
     adduct_patterns = adduct_search_patterns
+    singleton_ion = 'M+H+'
     delta_mz = PROTON
     if args.mode == 'neg':
         adduct_patterns = adduct_search_patterns_neg
         delta_mz = -PROTON
+        singleton_ion = 'M-H-'
 
-    subnetworks, peak_dict, edge_dict = local_read_file(infile=args.input,
-                    start_col=args.start,
-                    end_col=args.end,
+    peaklist = local_read_file(infile=args.input, start_col=args.start, end_col=args.end)
+    peak_dict = make_peak_dict(peaklist)
+    khipu_list, all_assigned_peaks = peaklist_to_khipu_list(peaklist, 
                     isotope_search_patterns=isotope_search_patterns, 
                     adduct_search_patterns=adduct_patterns,
+                    extended_adducts=extended_adducts,
                     mz_tolerance_ppm=args.ppm,
                     rt_tolerance=args.rtol,
-    )
-    WV = Weavor(peak_dict, isotope_search_patterns=isotope_search_patterns, 
-                adduct_search_patterns=adduct_patterns, 
-                mz_tolerance_ppm=args.ppm, mode=args.mode)
-    print("\n")
-    print("Initial khipu search grid: ")
-    print(WV.mzgrid)
-    print("\n")
+                    mode=args.mode,
+                    charges=[1, 2, 3],
+                    )
 
-    khipu_list = graphs_to_khipu_list(
-        subnetworks, WV, mz_tolerance_ppm=args.ppm,
-        )
-    khipu_list, all_assigned_peaks = extend_khipu_list(khipu_list, peak_dict, 
-                    extended_adducts, mz_tolerance_ppm=args.ppm,
-                    rt_tolerance=args.rtol)
-
-    print("\n\n ~~~~~~ Got %d khipus, with %d features ~~~~~~~ \n\n" 
+    print("\n ~~~~~~ Got %d khipus, with %d features ~~~~~~~ \n\n" 
                 %(len(khipu_list), len(all_assigned_peaks)))
     empCpds = export_empCpd_khipu_list(khipu_list)
 
@@ -203,43 +186,71 @@ def khipu_annotate(args):
     with open(outfile, 'w', encoding='utf-8') as f:
         json.dump(empCpds, f, ensure_ascii=False, indent=2)
 
-    singleton_ion = list(WV.mzgrid.columns)[0]
     export_khipu_table(outfile.replace(".json", ".tsv"), peak_dict, empCpds, singleton_ion, delta_mz)
 
 def peaklist_to_khipu_list(peaklist, 
                     isotope_search_patterns=isotope_search_patterns, 
                     adduct_search_patterns=adduct_search_patterns,
-
+                    extended_adducts=extended_adducts,
                     mz_tolerance_ppm=5,
                     rt_tolerance=2, 
-                    mode='pos'):
+                    mode='pos',
+                    charges=[1, 2, 3],
+                    has_parent_masstrack=False,
+                    ):
     '''A wrapper function easier for local data analysis.
     peaklist : list of input peaks/features in JSON notion as defined in Khipu or MetDataModel.
+    charges : multiple-charged ions considered.
     return khipu_list, all_assigned_peaks
     '''
-    subnetworks, peak_dict, edge_dict = peaks_to_networks(peaklist,
-                    isotope_search_patterns,
-                    adduct_search_patterns,
-                    mz_tolerance_ppm,
-                    rt_tolerance
-    )
-    WV = Weavor(peak_dict, isotope_search_patterns=isotope_search_patterns, 
-                adduct_search_patterns=adduct_search_patterns, 
-                mz_tolerance_ppm=mz_tolerance_ppm, 
-                mode=mode)
     print("\n")
-    print("Initial khipu search grid: ")
-    print(WV.mzgrid)
+    print("Multiple charges considered: " + str(charges))
     print("\n")
-    khipu_list = graphs_to_khipu_list(
-        subnetworks, WV, mz_tolerance_ppm=mz_tolerance_ppm,
+    khipu_list, assigned_peaks = [], []
+
+    for ch in charges:
+        iso_patterns = compute_multichaged_patterns(isotope_search_patterns, ch)
+        adduct_patterns = compute_multichaged_patterns(adduct_search_patterns, ch)
+        peaklist = [p for p in peaklist if p['id'] not in assigned_peaks]
+        subnetworks, peak_dict, edge_dict = peaks_to_networks(peaklist,
+                        iso_patterns,
+                        adduct_patterns,
+                        mz_tolerance_ppm,
+                        rt_tolerance
         )
-    khipu_list, all_assigned_peaks = extend_khipu_list(khipu_list, peak_dict, 
-                    extended_adducts, mz_tolerance_ppm=mz_tolerance_ppm,
-                    rt_tolerance=rt_tolerance)
+        WV = Weavor(peak_dict, isotope_search_patterns=iso_patterns, 
+                    adduct_search_patterns=adduct_patterns, 
+                    mz_tolerance_ppm=mz_tolerance_ppm, 
+                    mode=mode,
+                    charge=ch,
+                    parent_masstrack = has_parent_masstrack,
+                    )
+        print("Khipu search grid: ")
+        print(WV.mzgrid)
+        kps = graphs_to_khipu_list(
+            subnetworks, WV, mz_tolerance_ppm=mz_tolerance_ppm, id_start=len(khipu_list),
+            )
+        print(f"Constructed {len(kps)} khipus in this round.")
+        print("\n")
+        for KP in kps:
+            assigned_peaks += KP.nodes_to_use
+        khipu_list += kps
+    
+    dict_extended_adducts = {}
+    for ch in charges:
+        dict_extended_adducts[ch] = compute_multichaged_patterns(extended_adducts, ch)
+
+    khipu_list, all_assigned_peaks = extend_khipu_list(
+                    khipu_list, 
+                    peaklist, 
+                    dict_extended_adducts, 
+                    mz_tolerance_ppm=mz_tolerance_ppm,
+                    rt_tolerance=rt_tolerance
+                    )
+    
     return khipu_list, all_assigned_peaks
 
-def graphs_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
+def graphs_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm, id_start=0):
     '''Generate full khipu_list from subnetworks, 
     including iterative khipus based on features pruned out of initial subnetwork.
     '''
@@ -259,7 +270,7 @@ def graphs_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
                     khipu_list.append(KP)
 
     # assign IDs
-    ii = 0
+    ii = id_start
     for KP in khipu_list:
         if KP.valid:
             base_mz = str(round(KP.neutral_mass, 4))
@@ -269,19 +280,29 @@ def graphs_to_khipu_list(subnetworks, WeavorInstance, mz_tolerance_ppm):
 
     return khipu_list_valid
 
-def extend_khipu_list(khipu_list, peak_dict, adduct_search_patterns_extended, 
-                      mz_tolerance_ppm=5, rt_tolerance=2):
+def extend_khipu_list(khipu_list, 
+                      peaklist, 
+                      dict_extended_adducts,
+                      mz_tolerance_ppm=5, 
+                      rt_tolerance=2
+                      ):
     '''Update khipus by extended adduct search.
     Returns updated khipu_list and list_assigned_peaks.
+    New in version 0.7: multiple charges are accommodated via dict_extended_adducts.
     '''
     list_assigned_peaks = []
     for KP in khipu_list:
         list_assigned_peaks += KP.nodes_to_use
-    unassigned_peaks = [v for x,v in peak_dict.items() if x not in list_assigned_peaks]
+    # unassigned_peaks = [v for x,v in peak_dict.items() if x not in list_assigned_peaks]
+    unassigned_peaks = [p for p in peaklist if p['id'] not in list_assigned_peaks]
     mztree = build_centurion_tree(unassigned_peaks)
     for KP in khipu_list:
-        added_peaks = KP.extended_search(mztree, 
-                            adduct_search_patterns_extended,  mz_tolerance_ppm, rt_tolerance)
+        added_peaks = KP.extended_search(
+                            mztree, 
+                            dict_extended_adducts[KP.charge],  
+                            mz_tolerance_ppm, 
+                            rt_tolerance
+                            )
         list_assigned_peaks += added_peaks
 
     return khipu_list, set(list_assigned_peaks)
@@ -317,7 +338,7 @@ def export_khipu_table(outfile, peak_dict, json_khipu_list, singleton_ion='M+H+'
                 F['id'], str(F['mz']), str(F['rtime']), J['interim_id'], str(J['neutral_formula_mass']), 
                 F.get('isotope', ''), F.get('modification', ''), F['ion_relation']
             ]) + '\n'
-    # other peaks
+    # singleton peaks
     for k,F in peak_dict.items(): 
         if k not in in_khipu_list:
             s += '\t'.join([

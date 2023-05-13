@@ -17,6 +17,8 @@ logging.basicConfig(filename='khipu.log', level=logging.INFO)   #  encoding='utf
 PROTON = 1.00727646677
 electron = 0.000549
 
+# These are single-charged values. 
+# Double and Tripple charged ions are computed after the initial round, on the fly
 # avoid confusing adducts in initial search, e.g. H, H2O
 adduct_search_patterns = [  # initial patterns are relative to M+H+
                             (21.9820, 'Na/H'),
@@ -48,17 +50,20 @@ isotope_search_patterns = [ (1.003355, '13C/12C', (0, 0.8)),
 
 extended_adducts = [(1.0078, 'H'),
                             (-1.0078, '-H'),
-                            (10.991, 'Na/H, double charged'),
-                            (0.5017, '13C/12C, double charged'),
-                            (117.02655, '-NH3'),
+                            (1.9972, '37/35Cl'),
+                            (-17.02655, '-NH3'),
                             (17.02655, 'NH3'),
                             (-18.0106, '-H2O'),
                             (18.0106, 'H2O'),      # easy to confuse with bio reactions
                             (18.033823, 'NH4'),
                             (27.01089904, 'HCN'),
-                            (37.94694, 'Ca/H2'),
+                            (27.99492, 'CO'),
                             (32.026215, 'MeOH'),
+                            (-35.037114, '-NH3-H2O'),
+                            (37.94694, 'Ca/H2'),
                             (43.96389, 'Na2/H2'),
+                            (46.00548, 'CO2H2'),
+                            (-46.00548, '-CO2H2'),
                             (67.987424, 'NaCOOH'),
                             (83.961361, 'KCOOH'),
                             (97.96737927, 'H2SO4'),
@@ -74,18 +79,35 @@ relabel_dict = {
     'M+H+,M+H+,Na2/H2': 'M-H+Na+Na+',
 }
 
+def compute_multichaged_patterns(pattern=[(21.9820, 'Na/H'), (41.026549, 'ACN')], charge=2):
+    '''
+    Compute and return mass difference patterns for multiple charged ions.
+    '''
+    new = [list(x) for x in pattern]
+    note = ''
+    if charge > 1:
+        note = f", {charge}x charged"
+    for x in new:
+        x[0] = x[0] / charge
+        x[1] = x[1] + note
+    return new
+
 def make_expected_adduct_index(mode='pos', 
-                               pattern=[(21.9820, 'Na/H'), (41.026549, 'ACN')]):
+                               pattern=[(21.9820, 'Na/H'), (41.026549, 'ACN')],
+                               charge=1,
+                               ):
     '''Construct the adduct list for a core list of adduct m/z diff patterns. 
     Use neutral mass as 0 offset, so that later regression will compute neutral mass.
     Not modify adduct tag, so that the edges can be later mapped correctly.
     '''
     if mode == 'pos':
         # pos base ion as M+H+
-        return [(PROTON, 'M+H+'), ] + [(x[0] + PROTON, x[1]) for x in pattern] 
+        A0 = compute_multichaged_patterns([(PROTON, 'M+H+')], charge)
+        return A0 + [(x[0] + PROTON, x[1]) for x in pattern] 
     else:
         # neg base ion as M-H[-]
-        return [(-PROTON, 'M-H-')] + [(x[0] - PROTON, x[1]) for x in pattern]
+        A0 = compute_multichaged_patterns([(-PROTON, 'M-H-')], charge)
+        return A0 + [(x[0] - PROTON, x[1]) for x in pattern]
 
 
 def read_features_from_text(text_table, 
