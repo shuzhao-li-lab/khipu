@@ -1,7 +1,9 @@
+import numpy as np
 try:
     import matplotlib.pyplot as plt
 except:
     print("[khipu.utils] cannot import matplotlib, skipping.")
+
 
 def plot_khipugram(df, savepdf='', relabel={}):
     '''Plot the khipu grid as diagram.
