@@ -6,6 +6,7 @@ import json
 import numpy as np
 import networkx as nx
 from mass2chem.search import build_centurion_tree, find_all_matches_centurion_indexed_list
+from mass2chem.formula import parse_chemformula_dict_comprehensive
 
 import logging
 logging.basicConfig(filename='khipu.log', level=logging.INFO)   #  encoding='utf-8',
@@ -20,6 +21,9 @@ electron = 0.000549
 # These are single-charged values. 
 # Double and Tripple charged ions are computed after the initial round, on the fly
 # avoid confusing adducts in initial search, e.g. H, H2O
+
+
+
 adduct_search_patterns = [  # initial patterns are relative to M+H+
                             (21.9820, 'Na/H'),
                             (41.026549, 'ACN'),     # Acetonitrile
@@ -69,6 +73,32 @@ extended_adducts = [(1.0078, 'H'),
                             (97.96737927, 'H2SO4'),
                             (97.97689507, 'H3PO4'),
 ]
+
+ADDUCT_TO_FORMULA_DELTAS = {}
+for search_pattern in [*adduct_search_patterns, *adduct_search_patterns_neg, *extended_adducts]:
+    _, formula_offset = search_pattern
+    formula_offset = formula_offset.replace("ACN", "(C2H3N)")
+    formula_offset = formula_offset.replace("Me", "(CH3)")
+    if "/" in formula_offset:
+        gain, loss = formula_offset.split("/")
+    else:
+        gain, loss = formula_offset, None
+    if gain.startswith("-"):
+        if loss is None:
+            gain, loss = None, gain[1:]
+    if gain:
+        g_fdict = parse_chemformula_dict_comprehensive(gain)
+    else:
+        g_fdict = {}
+    if loss:
+        l_fdict = parse_chemformula_dict_comprehensive(loss)
+    else:
+        l_fdict = {}
+    net_fdict = {}
+    for key in set(list(g_fdict.keys()) + list(l_fdict.keys())):
+        net_fdict[key] = g_fdict.get(key, 0) - l_fdict.get(key, 0)
+    ADDUCT_TO_FORMULA_DELTAS[search_pattern[1]] = (g_fdict, l_fdict, net_fdict)
+ADDUCT_TO_FORMULA_DELTAS["M+H+"] = ({"H": 1}, {}, {"H": 1})
 
 relabel_dict = {
     'M+H+,Na/H': 'M+Na+',
