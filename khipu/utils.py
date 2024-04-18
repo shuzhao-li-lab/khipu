@@ -5,6 +5,7 @@ Adduct rules can be still better learned in the future.
 import json
 import numpy as np
 import networkx as nx
+import pandas as pd
 from mass2chem.search import build_centurion_tree, find_all_matches_centurion_indexed_list
 from mass2chem.formula import parse_chemformula_dict_comprehensive
 
@@ -139,6 +140,24 @@ def make_expected_adduct_index(mode='pos',
         A0 = compute_multichaged_patterns([(-PROTON, 'M-H-')], charge)
         return A0 + [(x[0] - PROTON, x[1]) for x in pattern]
 
+def khipu_list_to_ftable(khipu_list, field="MS1_pseudo_Spectra"):
+    ftable = []
+    for khipu in khipu_list:
+        if field == "MS1_pseudo_Spectra":
+            for peak in khipu["MS1_pseudo_Spectra"]:
+                ftable.append(peak)
+        if field == "isocor_results":
+            for adducted_formula in khipu["isocor_results"]:
+                formula, adduct = adducted_formula.split("_")
+                for peak in khipu["isocor_results"][adducted_formula]:
+                    new_peak = {
+                        "formula_for_correction": formula,
+                        "adduct_for_correction": adduct
+                    }
+                    for k, v in peak.items():
+                        new_peak[k] = v
+                    ftable.append(new_peak)  
+    return pd.DataFrame(ftable)          
 
 def read_features_from_text(text_table, 
                         id_col=0, mz_col=1, rtime_col=2, 
