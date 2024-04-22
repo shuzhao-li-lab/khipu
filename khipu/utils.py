@@ -203,11 +203,11 @@ def read_features_from_text(text_table,
             else:
                 iid = 'row'+str(ii)
             xstart, xend = intensity_cols
-            intensities = [float(x) for x in a[xstart: xend]]
+            intensities = {x[0]:float(x[1]) for x in zip(header[xstart: xend], a[xstart: xend])}
             L.append({
                 'id': iid, 'mz': float(a[mz_col]), 'rtime': float(a[rtime_col]),
                 'intensities': intensities,
-                'representative_intensity': np.mean(intensities),
+                'representative_intensity': np.mean([float(value) for value in intensities.values()])
             })
     return L
 
