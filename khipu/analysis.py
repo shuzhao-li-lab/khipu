@@ -44,43 +44,12 @@ def get_all_isotope_data(nist_path='.'):
             d[e] = dg
         return d
     
-    if not os.path.exists(nist_path):
-        r = req.get("https://physics.nist.gov/cgi-bin/Compositions/stand_alone.pl?ele=&all=all&ascii=ascii2&isotype=all")
-        isotopes = []
-        ele, mass, try_nap, nap = None, None, False, None
-        for l in r.text.split("\n"):
-            if l.startswith("Atomic Symbol"):
-                ele = l.split(" = ")[1]
-                if ele == "D":
-                    ele = "H"
-                elif ele == "T":
-                    ele = "H"
-            elif l.startswith("Relative Atomic Mass"):
-                mass = float(l.split(" = ")[1].split("(")[0])
-            elif l.startswith("Isotopic Composition"):
-                try_nap = True
-                try:
-                    nap = float(l.split(" = ")[1].split("(")[0])
-                except:
-                    nap = 0
-            if ele and mass and try_nap:
-                if nap > 0:
-                    isotopes.append({
-                        "element": ele,
-                        "mass": mass,
-                        "abundance": nap
-                    })
-                ele, mass, try_nap, nap = None, None, False, None
-        df = pd.DataFrame(isotopes)
-        df.to_csv(nist_path, sep=",")
     with open(str(nist_path), 'r', encoding='utf-8') as fp:
         dfIsotopes = pd.read_csv(fp, converters={'mass': Decimal, 'abundance': np.float64})
     _stripColNames(dfIsotopes)
     _stripCol(dfIsotopes, ['element', ])
     dictIsotopes = _makeIsotopesDict(dfIsotopes)
     return dictIsotopes
-
-# ISOTOPE_DATA_COMPREHENSIVE = get_all_isotope_data()
 
 def detect_labelling(khipu_list, unlabeled_samples, labeled_samples, result_name, labeling_threshold=10, skip_isos=None):
     skip_isos = {"M0"} if skip_isos is None else skip_isos
