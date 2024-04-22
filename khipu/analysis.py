@@ -207,11 +207,12 @@ def correct_natural_abundance_khipu(khipu,
                                 if iso not in khipu["isocor_results"][formula + "_" + adduct]:
                                     if f_id is not None:
                                         khipu["isocor_results"][formula + "_" + adduct][iso] = dict(peak_lookup[f_id]) # deep copy, otherwise original peak will be changed
+                                        khipu["isocor_results"][formula + "_" + adduct][iso]['nac_intensities'] = {}
                                         for sample in labeled_samples:
-                                            khipu["isocor_results"][formula + "_" + adduct][iso][sample] = 0
+                                            khipu["isocor_results"][formula + "_" + adduct][iso]['nac_intensities'][sample] = 0
                                         for sample in unlabeled_samples:
-                                            if sample in khipu["isocor_results"][formula + "_" + adduct][iso].keys():
-                                                del khipu["isocor_results"][formula + "_" + adduct][iso][sample]
+                                            if sample in khipu["isocor_results"][formula + "_" + adduct][iso]['nac_intensities'].keys():
+                                                del khipu["isocor_results"][formula + "_" + adduct][iso]['nac_intensities'][sample]
                                     else:
                                         khipu["isocor_results"][formula + "_" + adduct][iso] = {
                                             "apex": None,
@@ -233,7 +234,8 @@ def correct_natural_abundance_khipu(khipu,
                                             "ion_relation": iso + "," + adduct,
                                             "parent_epd_id": None
                                         }
-                                khipu["isocor_results"][formula + "_" + adduct][iso][ls] = corr_intensity
+                                        khipu["isocor_results"][formula + "_" + adduct][iso]['nac_intensities'] = {}
+                                khipu["isocor_results"][formula + "_" + adduct][iso]['nac_intensities'][ls] = corr_intensity
                 khipu["isocor_results"][formula + "_" + adduct] = list(khipu["isocor_results"][formula + "_" + adduct].values())
     return khipu
      
