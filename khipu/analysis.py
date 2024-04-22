@@ -18,8 +18,8 @@ TRACER_ELEMENT_MAP = {
 }
 
 TRACER_ISOTOPOLOGUE_MAP = {
-    "13C": "12C/13C",
-    "15N": "14N/15N",
+    "13C": "13C/12C",
+    "15N": "15N/14N",
 }
 
 TRACER_ABUNDANCE_VECTORS = {
@@ -85,7 +85,8 @@ def correct_natural_abundance(khipu_list,
                               resolution,
                               mz_of_resolution,
                               resolution_formula_code,
-                              nist_path):
+                              nist_path,
+                              unique_only):
     L = []
     for khipu in khipu_list:
         new_khipu = correct_natural_abundance_khipu(khipu, 
@@ -97,7 +98,7 @@ def correct_natural_abundance(khipu_list,
                                                     mz_of_resolution,
                                                     resolution_formula_code,
                                                     nist_path,
-                                                    unique_only=False,)
+                                                    unique_only=unique_only,)
         L.append(new_khipu)
     return L
 
@@ -134,7 +135,7 @@ def correct_natural_abundance_khipu(khipu,
                                     mz_of_resolution,
                                     resolution_formula_code,
                                     nist_path,
-                                    unique_only=True,):
+                                    unique_only,):
     if "isocor_results" not in khipu:
         khipu["isocor_results"] = {}
 
