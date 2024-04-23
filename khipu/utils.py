@@ -147,17 +147,16 @@ def khipu_list_to_ftable(khipu_list, field="MS1_pseudo_Spectra"):
             for peak in khipu["MS1_pseudo_Spectra"]:
                 ftable.append(peak)
         if field == "isocor_results":
-            for adducted_formula in khipu["isocor_results"]:
-                formula, adduct = adducted_formula.split("_")
-                for peak in khipu["isocor_results"][adducted_formula]:
+            for formula in khipu["isocor_results"]:
+                for peak in khipu["isocor_results"][formula]:
                     new_peak = {
                         "formula_for_correction": formula,
-                        "adduct_for_correction": adduct
+                        "adduct_for_correction": peak['modification']
                     }
                     for k, v in peak.items():
                         new_peak[k] = v
                     ftable.append(new_peak)  
-    return pd.DataFrame(ftable)          
+    return pd.DataFrame(ftable)               
 
 def read_features_from_text(text_table, 
                         id_col=0, mz_col=1, rtime_col=2, 
