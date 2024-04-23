@@ -26,6 +26,8 @@ def main():
             help='end column for intensity in input table')
     parser.add_argument('-o', '--output', 
             help='prefix of output files')
+    parser.add_argument('-r', '--regular', action='store_true',
+            help='toggle on if there is no isotopic labeled sample')
 
     args = parser.parse_args()
     khipu_annotate(args)

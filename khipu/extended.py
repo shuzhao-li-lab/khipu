@@ -167,7 +167,7 @@ def khipu_annotate(args):
     peaklist = local_read_file(infile=args.input, start_col=args.start, end_col=args.end)
     peak_dict = make_peak_dict(peaklist)
     khipu_list, all_assigned_peaks = peaklist_to_khipu_list(peaklist, 
-                    isotope_search_patterns=isotope_search_patterns, 
+                    isotope_search_patterns=isotope_search_patterns[:3] if args.regular else isotope_search_patterns, 
                     adduct_search_patterns=adduct_patterns,
                     extended_adducts=extended_adducts,
                     mz_tolerance_ppm=args.ppm,
