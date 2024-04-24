@@ -173,9 +173,10 @@ def correct_natural_abundance_khipu(khipu,
                 formula_dict = parse_chemformula_dict(formula)
 
                 # the formula should have the element of the tracer
-                tracer_ele = re.findall(r'[A-Z]+', tracer)
-                if not tracer_ele[0] in formula_dict.keys():
-                    continue
+                # JM: this is handled by max_ele without regex
+                #tracer_ele = re.findall(r'[A-Z]+', tracer)
+                #if not tracer_ele[0] in formula_dict.keys():
+                #    continue
 
                 for ele, count in ADDUCT_TO_FORMULA_DELTAS[adduct][2].items():
                     formula_dict[ele] = formula_dict.get(ele, 0) + count
