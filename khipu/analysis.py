@@ -5,12 +5,11 @@ import json
 import isocor
 import pandas as pd
 import requests as req
-import re
-import os
-from decimal import Decimal
+
 from mass2chem.formula import parse_chemformula_dict, dict_to_hill_formula
 from intervaltree import IntervalTree
 from .utils import ADDUCT_TO_FORMULA_DELTAS
+from .isotopes import get_isotope_data
 
 TRACER_ELEMENT_MAP = {
     "13C": "C",
@@ -27,37 +26,65 @@ TRACER_ABUNDANCE_VECTORS = {
     "15N": [0, 100],
 }
 
-def get_all_isotope_data(nist_path='.'):
-    def _stripColNames(df):
-        df.rename(columns=lambda x: x.strip())
 
-    def _stripCol(df, listcolumns):
-        for col in listcolumns:
-            df[col] = df[col].str.strip()
+def detect_labelling(khipu_list, 
+                     unlabeled_samples, 
+                     labeled_samples, 
+                     result_name, 
+                     labeling_threshold=10, 
+                     skip_isos=None):
+    """
+    Run detect labelling on every empirical compound.
 
-    def _makeIsotopesDict(df):
-        gb = df.groupby('element')
-        d = {}
-        for g in gb.groups:
-            dg = gb.get_group(g).sort_values(by='mass').to_dict('list')
-            e = dg.pop('element')[0]
-            d[e] = dg
-        return d
-    
-    with open(str(nist_path), 'r', encoding='utf-8') as fp:
-        dfIsotopes = pd.read_csv(fp, converters={'mass': Decimal, 'abundance': np.float64})
-    _stripColNames(dfIsotopes)
-    _stripCol(dfIsotopes, ['element', ])
-    dictIsotopes = _makeIsotopesDict(dfIsotopes)
-    return dictIsotopes
+    Args:
+        khipu_list (_type_): _description_
+        unlabeled_samples (list): list of unlabeled samples
+        labeled_samples (list): list of labeled samples
+        result_name (str): save the results using this key
+        labeling_threshold (int, optional): the ratio the mean labeled sample intensity must exceed the
+        mean unlabeled sample intensity.. Defaults to 10.
+        skip_isos (list, optional): isotoplogues to skip in the comparison. Defaults to ["M0"].
 
-def detect_labelling(khipu_list, unlabeled_samples, labeled_samples, result_name, labeling_threshold=10, skip_isos=None):
+    Updates:
+        the "labeling_scores" field in every khipu by adding the results under the key "result_name"
+    """    
     skip_isos = {"M0"} if skip_isos is None else skip_isos
     for khipu in khipu_list:
-        detect_labelling_khipu(khipu, unlabeled_samples, labeled_samples, result_name, labeling_threshold, skip_isos)
+        detect_labelling_khipu(khipu, 
+                               unlabeled_samples, 
+                               labeled_samples, 
+                               result_name, 
+                               labeling_threshold, 
+                               skip_isos)
     return khipu_list
 
-def detect_labelling_khipu(khipu, unlabeled_samples, labeled_samples, result_name, labeling_threshold=10, skip_isos=["M0"]):
+def detect_labelling_khipu(khipu, 
+                           unlabeled_samples, 
+                           labeled_samples, 
+                           result_name, 
+                           labeling_threshold=10, 
+                           skip_isos=None):
+    """
+    This counts the number of presumed labeled and unlabeled isotopologue features in each empCpd.
+
+    This compares the mean intensity of unlabeled and labeled samples, if the labeled is greater than
+    unlabeled mean intensity * labeling_threhsold, this is a "good" labelled isotopologue, else it
+    is a "bad" labelled isotopologue. The results on saved in a dictionary called "labeling_scores"
+    using the result_name field with counters for "good_labelling" and "bad_labelling". Isotopologues
+    in the skip_isos list or set, will not be considered in the counting. Should always include M0. 
+
+    Args:
+        khipu (dict): an empcpd
+        unlabeled_samples (list): list of unlabeled samples
+        labeled_samples (list): list of labeled samples
+        result_name (str): save the results using this key
+        labeling_threshold (int, optional): the ratio the mean labeled sample intensity must exceed the
+        mean unlabeled sample intensity.. Defaults to 10.
+        skip_isos (list, optional): isotoplogues to skip in the comparison. Defaults to ["M0"].
+
+    Updates:
+        the "labeling_scores" field in the khipu by adding the results under the key "result_name"
+    """    
     skip_isos = {"M0"} if skip_isos is None else skip_isos
     good_isotopologues = 0
     bad_isotopologues = 0
@@ -85,8 +112,29 @@ def correct_natural_abundance(khipu_list,
                               resolution,
                               mz_of_resolution,
                               resolution_formula_code,
-                              nist_path,
-                              unique_only):
+                              isotope_data_path=None,
+                              unique_only=True):
+    """
+    This performs isocor on every khipu. See the correct_natural_abundance_khipu
+    function for more details. 
+
+    Args:
+        khipu_list (list): list of empcpds
+        unlabeled_samples (list): list of unlabeled sample names
+        labeled_samples (list): list of labeled sample names
+        tracer (str): the isotope to correct for
+        tracer_purity (float): the purity of the tracer (assumes two isotopes per element)
+        resolution (integer): resolution of the instrument in resolving power
+        mz_of_resolution (float): the m/z at which the resolution was measured
+        resolution_formula_code (str): controls the type of instrument can be 'orbitrap', 'ft-icr', or 'constant'
+        charge (int): the charge of the molecule
+        isotope_data_path (str, optional): if provided, use the isotope data in this file. Defaults to None.
+        unique_only (bool): if true, only correct the empcpds with unique formula annotations
+
+    Updates:
+        This creates a new set of feature intensities for the labelled samples based on the correction for 
+        each adduct, formula. 
+    """
     L = []
     for khipu in khipu_list:
         new_khipu = correct_natural_abundance_khipu(khipu, 
@@ -97,7 +145,7 @@ def correct_natural_abundance(khipu_list,
                                                     resolution,
                                                     mz_of_resolution,
                                                     resolution_formula_code,
-                                                    nist_path,
+                                                    isotope_data_path=isotope_data_path,
                                                     unique_only=unique_only,)
         L.append(new_khipu)
     return L
@@ -110,14 +158,33 @@ def __build_isocor_corrector(formula,
                              mz_of_resolution,
                              resolution_formula_code,
                              charge,
-                             nist_path):
-     return isocor.mscorrectors.MetaboliteCorrectorFactory(
+                             isotope_data_path=None,
+                             adduct=None):
+    """
+    This function returns the appropriate isocor corrector for the given
+    input parameters.
+
+    Args:
+        formula (str): the formula of the compound to correct
+        tracer (str): the isotope to correct for
+        tracer_purity (float): the purity of the tracer (assumes two isotopes per element)
+        resolution (integer): resolution of the instrument in resolving power
+        mz_of_resolution (float): the m/z at which the resolution was measured
+        resolution_formula_code (str): controls the type of instrument can be 'orbitrap', 'ft-icr', or 'constant'
+        charge (int): the charge of the molecule
+        isotope_data_path (str, optional): if provided, use the isotope data in this file. Defaults to None.
+
+    Returns:
+        isocor corrector: an instance of an isocor corrector
+    """     
+    
+    return isocor.mscorrectors.MetaboliteCorrectorFactory(
         formula=formula,
         tracer=tracer,
         label=formula,
         inchi=None,
-        data_isotopes=get_all_isotope_data(nist_path),
-        derivative_formula=None,
+        data_isotopes=get_isotope_data(isotope_data_path),
+        derivative_formula=adduct,
         tracer_purity=[1 - tracer_purity, tracer_purity] if tracer_purity else None,
         correct_NA_tracer=True,
         resolution=resolution,
@@ -134,8 +201,38 @@ def correct_natural_abundance_khipu(khipu,
                                     resolution,
                                     mz_of_resolution,
                                     resolution_formula_code,
-                                    nist_path,
+                                    isotope_data_path,
                                     unique_only,):
+    
+    """
+    This performs isocor on the khipu. Only the labeled_samples are corrected.
+
+    The correction is performed using isocor, and the adduct is assumed to be 
+    unlabeled. 
+
+    The resolution of the instrument, the mz_of_resolution, and resolution
+    formula codes are used for constructing the constructor. If unique only is true
+    a khipu is only corrected if the khipu has a single formula annotated to it. 
+
+    Args:
+        khipu_list (list): list of empcpds
+        unlabeled_samples (list): list of unlabeled sample names
+        labeled_samples (list): list of labeled sample names
+        tracer (str): the isotope to correct for
+        tracer_purity (float): the purity of the tracer (assumes two isotopes per element)
+        resolution (integer): resolution of the instrument in resolving power
+        mz_of_resolution (float): the m/z at which the resolution was measured
+        resolution_formula_code (str): controls the type of instrument can be 'orbitrap', 'ft-icr', or 'constant'
+        charge (int): the charge of the molecule
+        isotope_data_path (str, optional): if provided, use the isotope data in this file. Defaults to None.
+        unique_only (bool): if true, only correct the empcpds with unique formula annotations
+
+    Updates:
+        This creates a new set of feature intensities for the labelled samples based on the correction for 
+        each adduct, formula. 
+    """
+
+
     if "isocor_results" not in khipu:
         khipu["isocor_results"] = {}
 
@@ -146,7 +243,8 @@ def correct_natural_abundance_khipu(khipu,
     else:
         charge = 1
 
-    if "list_matches" in khipu and khipu["list_matches"]: # yuanye, will need to update
+    if "list_matches" in khipu and khipu["list_matches"]: 
+        # yuanye, will need to update for your annotation format TODO
         formulas = [x[0].split("_")[0] for x in khipu["list_matches"]]
         if len(formulas) > 1 and unique_only:
             return khipu
@@ -188,7 +286,7 @@ def correct_natural_abundance_khipu(khipu,
                                                     mz_of_resolution,
                                                     resolution_formula_code,
                                                     charge,
-                                                    nist_path)
+                                                    isotope_data_path=isotope_data_path)
                 max_ele = parse_chemformula_dict(adduct_corrected_formula).get(TRACER_ELEMENT_MAP[tracer], 0)
                 if max_ele:
                     for ls in labeled_samples:
@@ -242,14 +340,36 @@ def correct_natural_abundance_khipu(khipu,
     return khipu
      
      
-def measure_overlap_with_GSMM(khipu_list, GEM, mz_tol=5):
+def measure_overlap_with_GEM(khipu_list, GEM, mz_tol=5):
+    """
+    This function performs annotation against the provided GEM
+    using IntervalTrees with the inferred neutral mass and 
+    the specified mz_tolerance.
+
+    Args:
+        khipu_list (list): list of empirical compounds
+        GEM (str): path to GEM in JSON format
+        mz_tol (int, optional): mz tolerance for the query. Defaults to 5.
+
+    Updates:
+        "in_GEM" and "GEM_annotations" a boolean and list, in the 
+        empCpd.
+    """    
     GEM_data = json.load(open(GEM))
     GEM_mz_tree = IntervalTree()
+    id_to_name = {}
     for cpd in GEM_data["list_of_compounds"]:
+        id_to_name[cpd['id']] = cpd['name']
         mass = cpd["neutral_mono_mass"]
         if mass:
             mass_err = mass / 1e6 * mz_tol
             GEM_mz_tree.addi(mass - mass_err, mass + mass_err, cpd['id'])
     for khipu in khipu_list:
-        khipu["in_GEM"] = bool(GEM_mz_tree.at(khipu["neutral_formula_mass"]))
+        if "in_GEM" not in khipu:
+            khipu["in_GEM"] = False
+        for r in GEM_mz_tree.at(khipu["neutral_formula_mass"]):
+            if "GEM_annotations" not in khipu:
+                khipu["GEM_annotations"] = []
+            khipu["in_GEM"] = True
+            khipu["GEM_annotations"].append(id_to_name[r.data])
     return khipu_list
