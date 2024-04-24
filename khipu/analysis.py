@@ -279,7 +279,9 @@ def correct_natural_abundance_khipu(khipu,
                 for ele, count in ADDUCT_TO_FORMULA_DELTAS[adduct][2].items():
                     formula_dict[ele] = formula_dict.get(ele, 0) + count
                 adduct_corrected_formula = dict_to_hill_formula(formula_dict)
-                corrector = __build_isocor_corrector(adduct_corrected_formula, 
+                max_ele = parse_chemformula_dict(adduct_corrected_formula).get(TRACER_ELEMENT_MAP[tracer], 0)
+                if max_ele:
+                    corrector = __build_isocor_corrector(adduct_corrected_formula, 
                                                     tracer,
                                                     tracer_purity,
                                                     resolution,
@@ -287,8 +289,6 @@ def correct_natural_abundance_khipu(khipu,
                                                     resolution_formula_code,
                                                     charge,
                                                     isotope_data_path=isotope_data_path)
-                max_ele = parse_chemformula_dict(adduct_corrected_formula).get(TRACER_ELEMENT_MAP[tracer], 0)
-                if max_ele:
                     for ls in labeled_samples:
                         peak_vector = [peaks_for_adduct.get(i, None) for i in range(max_ele + 1)]
                         to_correct = [peak_lookup.get(peaks_for_adduct.get(i, None), {}).get(ls, 0) for i in range(max_ele + 1)]
