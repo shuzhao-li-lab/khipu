@@ -100,6 +100,8 @@ for search_pattern in [*adduct_search_patterns, *adduct_search_patterns_neg, *ex
         net_fdict[key] = g_fdict.get(key, 0) - l_fdict.get(key, 0)
     ADDUCT_TO_FORMULA_DELTAS[search_pattern[1]] = (g_fdict, l_fdict, net_fdict)
 ADDUCT_TO_FORMULA_DELTAS["M+H+"] = ({"H": 1}, {}, {"H": 1})
+ADDUCT_TO_FORMULA_DELTAS["M-H-"] = ({}, {"H": 1}, {"H": -1})
+
 
 relabel_dict = {
     'M+H+,Na/H': 'M+Na+',
