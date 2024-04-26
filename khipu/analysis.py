@@ -336,6 +336,7 @@ def correct_natural_abundance_khipu(khipu,
                                         }
                                         khipu["isocor_results"][formula + "_" + adduct][iso]['nac_intensities'] = {}
                                 khipu["isocor_results"][formula + "_" + adduct][iso]['nac_intensities'][ls] = corr_intensity
+                                khipu["isocor_results"][formula + "_" + adduct][iso][ls] = corr_intensity
                 khipu["isocor_results"][formula + "_" + adduct] = list(khipu["isocor_results"][formula + "_" + adduct].values())
     return khipu
      
