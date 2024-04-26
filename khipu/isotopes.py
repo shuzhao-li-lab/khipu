@@ -1,6 +1,12 @@
+# this contains the raw isotope data for the isotope correction portion of khipu
+
 from decimal import Decimal
 import pandas as pd
 import numpy as np
+
+# this is a master list of isotopes sourced from NIST
+# update this if the NAPs in yours system are non-canonical
+# see the function below on how to override this list.
 
 ISOTOPE_RAW_DATA = """
     element,mass,abundance
