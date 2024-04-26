@@ -268,27 +268,31 @@ def correct_natural_abundance_khipu(khipu,
         for formula in formulas:
             for adduct, peaks_for_adduct in abundance_vectors.items():
                 khipu['isocor_results'][formula + "_" + adduct] = {}
-                formula_dict = parse_chemformula_dict(formula)
-
-                # the formula should have the element of the tracer
-                # JM: this is handled by max_ele without regex
-                #tracer_ele = re.findall(r'[A-Z]+', tracer)
-                #if not tracer_ele[0] in formula_dict.keys():
-                #    continue
-
+                metabolite_formula_dict = parse_chemformula_dict(formula)
+                adduct_formula_dict = {}
+                combined_formula_dict = {k: v for k,v in metabolite_formula_dict.items()}
                 for ele, count in ADDUCT_TO_FORMULA_DELTAS[adduct][2].items():
-                    formula_dict[ele] = formula_dict.get(ele, 0) + count
-                adduct_corrected_formula = dict_to_hill_formula(formula_dict)
-                max_ele = parse_chemformula_dict(adduct_corrected_formula).get(TRACER_ELEMENT_MAP[tracer], 0)
+                    # if negative, this means it was removed from the molecule being analyzed
+                    if count < 0:
+                        metabolite_formula_dict[ele] = metabolite_formula_dict.get(ele, 0) + count
+                    # if positive, it was added, implying it came from the environment and thus cannot be labeled.
+                    else:
+                        adduct_formula_dict[ele] = adduct_formula_dict.get(ele, 0) + count
+                    combined_formula_dict[ele].get(ele, 0) + count
+                adduct_formula = dict_to_hill_formula(adduct_formula_dict)
+                corrected_metabolite_formula = dict_to_hill_formula(metabolite_formula_dict)
+                adducted_metabolite_formula = dict_to_hill_formula(combined_formula_dict)
+                max_ele = parse_chemformula_dict(adducted_metabolite_formula).get(TRACER_ELEMENT_MAP[tracer], 0)
                 if max_ele:
-                    corrector = __build_isocor_corrector(adduct_corrected_formula, 
+                    corrector = __build_isocor_corrector(corrected_metabolite_formula, 
                                                     tracer,
                                                     tracer_purity,
                                                     resolution,
                                                     mz_of_resolution,
                                                     resolution_formula_code,
                                                     charge,
-                                                    isotope_data_path=isotope_data_path)
+                                                    isotope_data_path=isotope_data_path,
+                                                    adduct=adduct_formula)
                     for ls in labeled_samples:
                         peak_vector = [peaks_for_adduct.get(i, None) for i in range(max_ele + 1)]
                         to_correct = [peak_lookup.get(peaks_for_adduct.get(i, None), {}).get(ls, 0) for i in range(max_ele + 1)]
