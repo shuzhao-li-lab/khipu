@@ -284,7 +284,7 @@ def correct_natural_abundance_khipu(khipu,
                 adducted_metabolite_formula = dict_to_hill_formula(combined_formula_dict)
                 max_ele = parse_chemformula_dict(adducted_metabolite_formula).get(TRACER_ELEMENT_MAP[tracer], 0)
                 if max_ele:
-                    corrector = __build_isocor_corrector(corrected_metabolite_formula, 
+                    corrector = __build_isocor_corrector(adducted_metabolite_formula, 
                                                     tracer,
                                                     tracer_purity,
                                                     resolution,
