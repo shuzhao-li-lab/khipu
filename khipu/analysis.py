@@ -278,7 +278,7 @@ def correct_natural_abundance_khipu(khipu,
                     # if positive, it was added, implying it came from the environment and thus cannot be labeled.
                     else:
                         adduct_formula_dict[ele] = adduct_formula_dict.get(ele, 0) + count
-                    combined_formula_dict[ele].get(ele, 0) + count
+                    combined_formula_dict[ele] = combined_formula_dict.get(ele, 0) + count
                 adduct_formula = dict_to_hill_formula(adduct_formula_dict)
                 corrected_metabolite_formula = dict_to_hill_formula(metabolite_formula_dict)
                 adducted_metabolite_formula = dict_to_hill_formula(combined_formula_dict)
