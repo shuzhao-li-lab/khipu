@@ -6,7 +6,7 @@
 
 Pre-annotation tool to annotate degenerate ions in relationships to the original compound and infer neutral mass. The initial version was described in [Li and Zheng (2023). Analytical chemistry, 95(15), pp.6212-6217](https://pubs.acs.org/doi/10.1021/acs.analchem.2c05810).
 
-This applies to regular LC-MS data, but also enables easy analysis of isotope tracing and chemical labeling data. Different applications may require different parameters. A web server for isotope tracing data is now available at http://metabolomics.cloud/khipu.
+This applies to regular LC-MS data, but also enables easy analysis of isotope tracing and chemical labeling data. Different applications may require different parameters. A web server for isotope tracing data is now available at https://metabolomics.cloud/khipu.
 
 ![khipugram](doc/khipugram.png)
 
