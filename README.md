@@ -4,9 +4,9 @@
 [![DOI](https://img.shields.io/badge/DOI-doi%2F10.1021%2Facs.analchem.2c05810-blue)](https://pubs.acs.org/doi/10.1021/acs.analchem.2c05810)
 
 
-Pre-annotation tool to annotate degenerate ions in relationships to the original compound and infer neutral mass. 
+Pre-annotation tool to annotate degenerate ions in relationships to the original compound and infer neutral mass. The initial version was described in [Li and Zheng (2023). Analytical chemistry, 95(15), pp.6212-6217](https://pubs.acs.org/doi/10.1021/acs.analchem.2c05810).
 
-This applies to regular LC-MS data, but also enables easy analysis of isotope tracing and chemical labeling data.
+This applies to regular LC-MS data, but also enables easy analysis of isotope tracing and chemical labeling data. Different applications may require different parameters. A web server for isotope tracing data is now available at http://metabolomics.cloud/khipu.
 
 ![khipugram](doc/khipugram.png)
 
@@ -132,3 +132,13 @@ Khipu is a recording device using knots, often 2-level of strings,
 historically used by people in Andean South America, includign Inca (https://en.wikipedia.org/wiki/Quipu).
 The format is similar to how we represent isotopes and adducts in our data.
 We chose "khipu" over the spelling of "quipu", to pay respect to the indigenous people.
+
+## Khipu is part of The Asari Project.
+
+- asari (Source code: https://github.com/shuzhao-li/asari, Package Repository: https://pypi.org/project/asari-metabolomics/)
+- metDataModel: data models for metabolomics (https://github.com/shuzhao-li-lab/metDataModel)
+- mass2chem: common utilities in interpreting mass spectrometry data, annotation (https://github.com/shuzhao-li-lab/mass2chem)
+- khipu: a Python library for generalized, low-level annotation of MS metabolomics (https://github.com/shuzhao-li-lab/khipu)
+- JMS: Json's Metabolite Services. Search functions, annotation and metabolic models (https://github.com/shuzhao-li-lab/JMS)
+- pcpfm pipeline (https://github.com/shuzhao-li-lab/PythonCentricPipelineForMetabolomics)
+- asari-x: the eXposome miner (to be released)

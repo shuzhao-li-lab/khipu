@@ -1,4 +1,4 @@
-__version__ = "0.7.7"
+__version__ = "2.0.0"
 
 from . import analysis
 from . import extended
