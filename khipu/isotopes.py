@@ -8,8 +8,7 @@ import numpy as np
 # update this if the NAPs in yours system are non-canonical
 # see the function below on how to override this list.
 
-ISOTOPE_RAW_DATA = """
-    element,mass,abundance
+ISOTOPE_RAW_DATA = """element,mass,abundance
     H,1.00782503223,0.999885
     H,2.01410177812,0.000115
     He,3.0160293201,1.34e-06
@@ -387,8 +386,7 @@ ISOTOPE_RAW_DATA = """
     U,235.0439301,0.007204
     U,236.0000,0.0000
     U,237.0000,0.0000
-    U,238.0507884,0.992742
-"""
+    U,238.0507884,0.992742"""
 
 def get_isotope_data(data_path=None):
     """
@@ -423,10 +421,10 @@ def get_isotope_data(data_path=None):
     
     if data_path is None:
         parsed_data = []
-        iso_data = ISOTOPE_RAW_DATA[0].strip()
+        iso_data = ISOTOPE_RAW_DATA[0].split("\n")
         for line in iso_data[1:]:
             element, mass, abundance = line.strip().split(",")
-            dfIsotopes.append({
+            parsed_data.append({
                 "element": element,
                 "mass": Decimal(mass),
                 "abundance": np.float64(abundance)
