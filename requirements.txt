@@ -6,3 +6,4 @@ scipy
 networkx
 mass2chem
 setuptools
+isocor
