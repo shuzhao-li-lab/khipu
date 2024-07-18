@@ -50,7 +50,7 @@ setup(
     'requests',
     'scipy',
     'treelib'
-  ]
+  ],
 
   python_requires='>=3.7',
 
