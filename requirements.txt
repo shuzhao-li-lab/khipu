@@ -7,3 +7,4 @@ networkx
 mass2chem
 setuptools
 isocor
+intervaltree
