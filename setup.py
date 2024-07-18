@@ -40,10 +40,17 @@ setup(
   ),
   include_package_data=True,
   install_requires=[
+    'intervaltree',
+    'isocor',
     'mass2chem',
-    'treelib',
-    'networkx'
-  ],
+    'matplotlib',
+    'numpy',
+    'networkx',
+    'pandas',
+    'requests',
+    'scipy',
+    'treelib'
+  ]
 
   python_requires='>=3.7',
 
