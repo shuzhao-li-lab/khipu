@@ -289,6 +289,56 @@ def assign_masstrack_ids_in_khipu(feature_dict, mz_tolerance_ppm=5):
 
     return feature_dict
 
+def __edge_search(list_peaks,
+                mztree,
+                search_patterns,
+                mz_tolerance_ppm=5,
+                rt_tolerance=2,
+                check_edge_ratio=False):
+    
+    '''Search for mass patterns between co-eluting features. 
+
+    This is the fundamental search function in Khipu for constructing the nascent network. 
+
+    It should only be called via helper functions (see below).
+
+    Parameters
+    ----------
+    list_peaks: 
+        [{'parent_masstrace_id': 1670, 'mz': 133.09702315984987, 'rtime': 654, 'height': 14388.0, 'id': 555}, ...]
+    mztree: 
+        indexed list_peaks
+    mz_tolerance_ppm: 
+        ppm tolerance in examining m/z patterns.
+    search_patterns: 
+        a list in the format of [(mz difference, relation, (ratio low limit, ratio high limit)), ..]
+        what the patterns represent is not enforced here, only the mz and rtime similarity of features
+    rt_tolerance: 
+        tolerance threshold for deviation in retetion time, arbitrary unit depending on input data.
+        Default intended as 2 seconds.
+    check_edge_ratio:
+        if True, enforce the relationships in the search_patterns if provided, else ignore. 
+        default is that this is disabled as such rules do not exist for all mass delta patterns
+
+    Returns
+    -------
+    list of lists of peak pairs that match search_patterns patterns, 
+    e.g.[ (P1, P2, 'relation'), ...]. 
+    '''
+    
+    signatures = []
+    for P1 in list_peaks:
+        for _pair in search_patterns:
+            # search pattern is of form: [mass_difference, relation, ratio] where ratio is optional and of form (min, max)
+            # where min and max are floats specifying range of intensity relationship. 
+            for P2 in find_all_matches_centurion_indexed_list(P1['mz'] + _pair[0], mztree, mz_tolerance_ppm):
+                if abs(P1['rtime'] - P2['rtime']) <= rt_tolerance:
+                    if check_edge_ratio and len(_pair) > 2:
+                        if _pair[2][0] * P1['height'] < P2['height'] < _pair[2][1] * P1['height']:
+                            signatures.append((P1['id'], P2['id'], _pair[1]))
+                    else:
+                        signatures.append((P1['id'], P2['id'], _pair[1]))
+    return signatures
 
 def get_isotopic_edge_pairs(list_peaks, 
                     mztree, 
@@ -325,27 +375,19 @@ def get_isotopic_edge_pairs(list_peaks,
         list of lists of peak pairs that match search_patterns patterns, 
         e.g.[ (195, 206, '13C/12C'), ...]. 
     '''
-    signatures = []
-    for P1 in list_peaks:
-        matched = [  ] 
-        for _pair in search_patterns:
-            (mass_difference, relation) = _pair[:2]
-            tmp = find_all_matches_centurion_indexed_list(P1['mz'] + mass_difference, mztree, mz_tolerance_ppm)
-            for P2 in tmp:
-                if abs(P1['rtime']-P2['rtime']) <= isotope_rt_tolerance:
-                    if check_isotope_ratio and len(_pair) > 2:  # checking abundance ratio
-                        (abundance_ratio_min, abundance_ratio_max) = _pair[2]
-                        if abundance_ratio_min*P1['height'] < P2['height'] < abundance_ratio_max*P1['height']:
-                            matched.append( (P1['id'], P2['id'], relation) )
-                    else:
-                        matched.append( (P1['id'], P2['id'], relation) )
-        signatures += matched
-    return signatures
-
-def get_adduct_edge_pairs(list_peaks, 
+    return __edge_search(list_peaks,
+                mztree,
+                search_patterns=search_patterns,
+                mz_tolerance_ppm=mz_tolerance_ppm,
+                rt_tolerance=isotope_rt_tolerance,
+                check_edge_ratio=check_isotope_ratio)
+           
+def get_adduct_edge_pairs(
+                    list_peaks, 
                     mztree, 
                     search_patterns = [(1.0078, 'H'), (21.9820, 'Na/H'), (41.026549, 'ACN')],
-                    mz_tolerance_ppm=5, rt_tolerance=2,
+                    mz_tolerance_ppm=5, 
+                    rt_tolerance=2,
                     ):
     '''
     To find all pairs of adducts (fragments and neutral loss can be accommodated using negative mz difference). 
@@ -369,17 +411,14 @@ def get_adduct_edge_pairs(list_peaks,
         list of lists of peak pairs that match search_patterns patterns, e.g.
         [ (195, 206, 'H/Na'), ...]. 
     '''
-    signatures = []
-    for P1 in list_peaks:
-        matched = [  ] 
-        for _pair in search_patterns:
-            (mass_difference, relation) = _pair[:2]
-            tmp = find_all_matches_centurion_indexed_list(P1['mz'] + mass_difference, mztree, mz_tolerance_ppm)
-            for P2 in tmp:
-                if abs(P1['rtime']-P2['rtime']) <= rt_tolerance:
-                    matched.append( (P1['id'], P2['id'], relation) )
-        signatures += matched
-    return signatures
+    return __edge_search(
+        list_peaks,
+        mztree,
+        search_patterns=search_patterns,
+        mz_tolerance_ppm=mz_tolerance_ppm,
+        rt_tolerance=rt_tolerance,
+        check_edge_ratio=False
+    )
 
 
 def peaks_to_networks(peak_list, 
@@ -449,13 +488,15 @@ def peaks_to_networks(peak_list,
     '''
     mztree = build_centurion_tree(peak_list)
     peak_dict = make_peak_dict(peak_list)
-    iso_edges = get_isotopic_edge_pairs(peak_list, mztree, 
+    iso_edges = get_isotopic_edge_pairs(peak_list, 
+                                        mztree, 
                                         search_patterns=isotope_search_patterns,
                                         mz_tolerance_ppm=mz_tolerance_ppm,
                                         isotope_rt_tolerance=rt_tolerance,
                                         check_isotope_ratio=False,
                                         )
-    adduct_edges = get_adduct_edge_pairs(peak_list, mztree,
+    adduct_edges = get_adduct_edge_pairs(peak_list, 
+                                         mztree,
                                         search_patterns=adduct_search_patterns,
                                         mz_tolerance_ppm=mz_tolerance_ppm,
                                         rt_tolerance=rt_tolerance,
