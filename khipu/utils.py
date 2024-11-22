@@ -617,20 +617,13 @@ def export_tsv_trees(trees, outfile="export_annoTree.tsv"):
         O.write(s)
 
 def is_datatag_in_tree(tree, datatag="13C/12C*6"):
-    _in_ = False
     for node in tree.nodes:
         if datatag in tree.get_node(node).tag or datatag in tree.get_node(node).data:
-            _in_ = True
-            
-    return _in_
+           return True
+    return False
 
 def find_trees_by_datatag(trees, datatag="13C/12C*6"):
-    found = []
-    for tree in trees:
-        if is_datatag_in_tree(tree, datatag):
-            found.append(tree)
-            
-    return found
+    return [tree for tree in trees if is_datatag_in_tree(tree, datatag)]
 
 def find_trees_by_datatag_list(trees, datatag_list=["13C/12C", 
                                 "13C/12C*2", "13C/12C*3", "13C/12C*4", "13C/12C*5", "13C/12C*6",]):
