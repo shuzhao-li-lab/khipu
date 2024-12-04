@@ -8,6 +8,9 @@ import numpy as np
 # update this if the NAPs in yours system are non-canonical
 # see the function below on how to override this list.
 
+PROTON = 1.00727646677
+ELECTRON = 0.000549
+
 ISOTOPE_RAW_DATA = """element,mass,abundance
     H,1.00782503223,0.999885
     H,2.01410177812,0.000115

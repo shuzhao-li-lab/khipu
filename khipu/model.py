@@ -614,6 +614,7 @@ class Khipu:
                             index=self.khipu_grid.index,
                             columns=self.khipu_grid.columns,
         )
+
         for ii in range(_M):
             for jj in range(_N):
                 if self.khipu_grid.iloc[ii,jj]:

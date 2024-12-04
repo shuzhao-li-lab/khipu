@@ -9,6 +9,9 @@ import pandas as pd
 from mass2chem.search import build_centurion_tree, find_all_matches_centurion_indexed_list
 from mass2chem.formula import parse_chemformula_dict_comprehensive
 
+from .isotopes import PROTON
+from .isotopes import ELECTRON as electron # for compatibility
+
 import logging
 logging.basicConfig(filename='khipu.log', level=logging.INFO)   #  encoding='utf-8',
 
@@ -16,8 +19,6 @@ logging.basicConfig(filename='khipu.log', level=logging.INFO)   #  encoding='utf
 # m/z differences corresponding to adducts and isotopes
 # Not using charge in tables, because all m/z diff is relative to other charged ions
 #
-PROTON = 1.00727646677
-electron = 0.000549
 
 # These are single-charged values. 
 # Double and Tripple charged ions are computed after the initial round, on the fly

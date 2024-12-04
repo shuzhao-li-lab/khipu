@@ -31,37 +31,32 @@ def get_khipu_dict(features, mode='pos'):
     )
     return khipu_dict
 
+def get_isotopologue(MS1_pseudo_Spectra, search_pattern, substring=False, return_most_intense=True, return_mode="feature"):
+    substring_modes = {
+        True: __contains__,
+        False: __eq__
+    }
+    return_modes = {
+        "intensity": 0,
+        "id": 1,
+        "feature": 2
+    }
+    matches = [(f['representative_intensity'], f['id'], f) for f in MS1_pseudo_Spectra if substring_modes[substring](search_pattern, f['isotope'])]
+    matches = sorted(matches, reverse=True)[0][return_modes[return_mode]] if return_most_intense else matches
+    if matches:
+        return matches[0][2]
+    else:
+        return []
 
 def get_M0(MS1_pseudo_Spectra):
-    '''returns M0 feature with highest representative_intensity.
-    Without verifying which ion form.'''
-    M0 = [(f['representative_intensity'], f['id'], f) for f in 
-          MS1_pseudo_Spectra if f['isotope']=='M0']
-    if M0:    # use f['id'] as tie breaker in sort
-        return sorted(M0, reverse=True)[0][2]
-    else:
-        return []
-    
+    return get_isotopologue(MS1_pseudo_Spectra, 'M0', substring=False, return_most_intense=True)
+
 def get_M1(MS1_pseudo_Spectra):
-    '''returns M+1 feature with highest representative_intensity.
-    Without verifying which ion form.'''
-    M = [(f['representative_intensity'], f['id'], f) for f in 
-          MS1_pseudo_Spectra if f['isotope']=='13C/12C']
-    if M:
-        return sorted(M, reverse=True)[0][2]
-    else:
-        return []
+    return get_isotopologue(MS1_pseudo_Spectra, '13C/12C', substring=False, return_most_intense=True)
      
 def get_highest_13C(MS1_pseudo_Spectra):
-    '''returns 13C labeled feature with highest representative_intensity.
-    Without verifying which ion form. Because the label goes with sepecific atoms depending on pathway.
-    '''
-    M = [(f['representative_intensity'], f) for f in 
-          MS1_pseudo_Spectra if '13C/12C' in f['isotope']]
-    if M:
-        return sorted(M, reverse=True)[0][1]
-    else:
-        return []
+    return get_isotopologue(MS1_pseudo_Spectra, search_pattern='13C/12C', substring=True, return_most_intense=True, return_mode='id')
+
 
 def get_labeled(kdict, label_ratio_filter=0.2):
     '''
