@@ -367,7 +367,7 @@ def measure_overlap_with_GEM(khipu_list, GEM, mz_tol=5):
         id_to_name[cpd['id']] = cpd['name']
         mass = cpd["neutral_mono_mass"]
         if mass:
-            mass_err = mass / 1e6 * mz_tol
+            mass_err = abs(mass / 1e6 * mz_tol)
             GEM_mz_tree.addi(mass - mass_err, mass + mass_err, cpd['id'])
     for khipu in khipu_list:
         if "in_GEM" not in khipu:
