@@ -6,14 +6,13 @@ Weavor is constructed once and provides the main algorithms and functions;
 Khipu is mainlty the data structures and built as one instance per emprical compound.
 So from one experiment/feature table, one may get 10**3 khipus.
 '''
-import logging
 import numpy as np
 import pandas as pd
 import treelib
 from scipy.optimize import curve_fit
 from .plot import plot_khipugram
 from .utils import *
-
+# import logging
 
 class Weavor:
     '''For each experiment, this class sets up a grid of isotopes and adducts,
@@ -350,6 +349,8 @@ class Khipu:
         self.khipu_grid : pd.DataFrame
         self.neutral_mass : inferred neutral mass for the khipu compound
         '''
+        logging.basicConfig(filename='khipu.log', level=logging.INFO)   #  encoding='utf-8',
+
         self._size_limit_ = WeavorInstance._size    # Set max limit of feature number based on grid size
         self.charge = WeavorInstance.charge
         self.feature_dict, self.mzstr_dict = self.get_feature_dict(

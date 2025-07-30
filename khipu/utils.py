@@ -10,7 +10,7 @@ from mass2chem.search import build_centurion_tree, find_all_matches_centurion_in
 from mass2chem.formula import parse_chemformula_dict_comprehensive
 
 import logging
-logging.basicConfig(filename='khipu.log', level=logging.INFO)   #  encoding='utf-8',
+# logging.basicConfig(filename='khipu.log', level=logging.INFO)   #  encoding='utf-8',
 
 #
 # m/z differences corresponding to adducts and isotopes

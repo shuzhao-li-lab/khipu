@@ -1,5 +1,5 @@
 import argparse
-from khipu import __version__
+from khipu import __version__  # This is installed module version, not the one in khipu/__init__.py
 from .extended import *
 
 
