@@ -39,6 +39,7 @@ class epdsConstructor:
                         extended_adducts,
                         mz_tolerance_ppm,
                         rt_tolerance=2,
+                        check_isotope_ratio=False,
                         charges=[1, 2, 3],
                         has_parent_masstrack=True,
         ):
@@ -76,6 +77,7 @@ class epdsConstructor:
                     extended_adducts=extended_adducts,
                     mz_tolerance_ppm=mz_tolerance_ppm,
                     rt_tolerance=rt_tolerance,
+                    check_isotope_ratio=check_isotope_ratio,
                     mode=self.mode,
                     charges=charges,
                     has_parent_masstrack=has_parent_masstrack,
