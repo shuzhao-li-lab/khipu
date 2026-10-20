@@ -394,6 +394,7 @@ def peaks_to_networks(peak_list,
                                         ],
                     mz_tolerance_ppm=5, 
                     rt_tolerance=2, 
+                    check_isotope_ratio=False
                     ):
     '''Search peak_list for patterns of isotopes and adducts, form a network and get connected subnetworks.
     
@@ -445,7 +446,8 @@ def peaks_to_networks(peak_list,
         Features of low abundance may not have detectable isotopes, but can have multiple adducts.
         Do not include too many adducts in the intial search. 
         Do not include neutral loss and fragments in initial search.
-        They are better done after a list of khipus are constructed.
+        They are better done after a list of khipus are constructed. 
+        In isotope labeling data, e.g. 13C, the labeled features can be more abundant than unlabeled.
     '''
     mztree = build_centurion_tree(peak_list)
     peak_dict = make_peak_dict(peak_list)
@@ -453,7 +455,7 @@ def peaks_to_networks(peak_list,
                                         search_patterns=isotope_search_patterns,
                                         mz_tolerance_ppm=mz_tolerance_ppm,
                                         isotope_rt_tolerance=rt_tolerance,
-                                        check_isotope_ratio=False,
+                                        check_isotope_ratio=check_isotope_ratio,
                                         )
     adduct_edges = get_adduct_edge_pairs(peak_list, mztree,
                                         search_patterns=adduct_search_patterns,

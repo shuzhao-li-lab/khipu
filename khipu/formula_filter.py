@@ -1,11 +1,13 @@
 '''
-Ad hoc function to clean up current khipu or asari output, 
+Not in use. 
+These will be further developed and added to future khipu versions.
+
+Ad hoc function to clean up current khipu or asari output:
 1. add neutral formula to empCpd dictionary
 2. check possible isotope pattern against number of atoms in the formula and add tag 'okay_formula'
 
 Will add mass calibration step too.
 
-These will be further developed and added to future khipu versions.
 
 SL 2023-10-01
 '''

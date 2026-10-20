@@ -18,6 +18,7 @@ def main():
             help='mass precision in ppm (part per million), same as mz_tolerance_ppm')
     parser.add_argument('--rtol', default=2, type=float, 
             help='tolerance of retention time match, arbitrary unit dependent on preprocessing tool')
+    
     parser.add_argument('-i', '--input', 
             help='input file as feature table')
     parser.add_argument('-s', '--start',  default=3, type=int,
@@ -28,6 +29,8 @@ def main():
             help='prefix of output files')
     parser.add_argument('-r', '--regular', action='store_true',
             help='toggle on if there is no isotopic labeled sample')
+    parser.add_argument('--ratio', default=False, 
+                        help='enforcing isotopic ratios')
 
     args = parser.parse_args()
     khipu_annotate(args)

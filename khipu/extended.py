@@ -172,6 +172,7 @@ def khipu_annotate(args):
                     extended_adducts=extended_adducts,
                     mz_tolerance_ppm=args.ppm,
                     rt_tolerance=args.rtol,
+                    check_isotope_ratio=args.ratio,
                     mode=args.mode,
                     charges=[1, 2, 3],
                     )
@@ -194,6 +195,7 @@ def peaklist_to_khipu_list(peaklist,
                     extended_adducts=extended_adducts,
                     mz_tolerance_ppm=5,
                     rt_tolerance=2, 
+                    check_isotope_ratio=False,
                     mode='pos',
                     charges=[1, 2, 3],
                     has_parent_masstrack=False,
@@ -216,7 +218,8 @@ def peaklist_to_khipu_list(peaklist,
                         iso_patterns,
                         adduct_patterns,
                         mz_tolerance_ppm,
-                        rt_tolerance
+                        rt_tolerance, 
+                        check_isotope_ratio
         )
         WV = Weavor(peak_dict, isotope_search_patterns=iso_patterns, 
                     adduct_search_patterns=adduct_patterns, 
