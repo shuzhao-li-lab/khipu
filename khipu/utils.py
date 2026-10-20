@@ -16,7 +16,8 @@ from .ion_patterns import *
 
 
 ADDUCT_TO_FORMULA_DELTAS = {}
-for search_pattern in [*adduct_search_patterns, *adduct_search_patterns_neg, *extended_adducts]:
+for search_pattern in [*adduct_search_patterns, *adduct_search_patterns_neg]:
+                       # , *extended_adducts]:
     _, formula_offset = search_pattern
     formula_offset = formula_offset.replace("ACN", "(C2H3N)")
     formula_offset = formula_offset.replace("Me", "(CH3)")
