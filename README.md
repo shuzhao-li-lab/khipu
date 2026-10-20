@@ -8,6 +8,9 @@ Pre-annotation tool to annotate degenerate ions in relationships to the original
 
 This applies to regular LC-MS data, but also enables easy analysis of isotope tracing and chemical labeling data. Different applications may require different parameters. A web server for isotope tracing data (described in [Mitchell et al (2024) Journal of the American Society for Mass Spectrometry. https://doi.org/10.1021/jasms.4c00175]) is now available at https://metabolomics.cloud/khipu/.
 
+The detectable khipu model explained the metabolomics “dark matter” (Chi, et al (2026). Metabolomics, 22(3), p.79, https://link.springer.com/article/10.1007/s11306-026-02456-y). The paper included lists of in-source fragments, now available in this package.
+
+
 ![khipugram](doc/khipugram.png)
 
 ## Implementation overview

@@ -12,68 +12,8 @@ from mass2chem.formula import parse_chemformula_dict_comprehensive
 import logging
 # logging.basicConfig(filename='khipu.log', level=logging.INFO)   #  encoding='utf-8',
 
-#
-# m/z differences corresponding to adducts and isotopes
-# Not using charge in tables, because all m/z diff is relative to other charged ions
-#
-PROTON = 1.00727646677
-electron = 0.000549
+from .ion_patterns import *
 
-# These are single-charged values. 
-# Double and Tripple charged ions are computed after the initial round, on the fly
-# avoid confusing adducts in initial search, e.g. H, H2O
-
-
-
-adduct_search_patterns = [  # initial patterns are relative to M+H+
-                            (21.9820, 'Na/H'),
-                            (41.026549, 'ACN'),     # Acetonitrile
-                            (35.9767, 'HCl'),
-                            (37.955882, 'K/H'),
-                            ]
-
-adduct_search_patterns_neg = [ (35.9767, 'HCl'), 
-                            (46.00548, 'HCOOH'),
-                            (21.9820, 'Na/H'), 
-                            (41.026549, 'ACN'),
-                            (37.955882, 'K/H'),
-                            ]
-
-isotope_search_patterns = [ (1.003355, '13C/12C', (0, 0.8)),
-                            (2.00671, '13C/12C*2', (0, 0.8)),
-                            (3.010065, '13C/12C*3', (0, 0.8)),
-                            (4.01342, '13C/12C*4', (0, 0.8)),
-                            (5.016775, '13C/12C*5', (0, 0.8)),
-                            (6.02013, '13C/12C*6', (0, 0.8)),
-                            (7.023485, '13C/12C*7', (0, 0.8)),
-                            (8.02684, '13C/12C*8', (0, 0.8)),
-                            (9.030195, '13C/12C*9', (0, 0.8)),
-                            (10.03355, '13C/12C*10', (0, 0.8)),
-                            (11.036905, '13C/12C*11', (0, 0.8)),
-                            (12.04026, '13C/12C*12', (0, 0.8)),
-                            ]
-
-extended_adducts = [(1.0078, 'H'),
-                            (-1.0078, '-H'),
-                            (1.9972, '37/35Cl'),
-                            (-17.02655, '-NH3'),
-                            (17.02655, 'NH3'),
-                            (-18.0106, '-H2O'),
-                            (18.0106, 'H2O'),      # easy to confuse with bio reactions
-                            (18.033823, 'NH4'),
-                            (27.01089904, 'HCN'),
-                            (27.99492, 'CO'),
-                            (32.026215, 'MeOH'),
-                            (-35.037114, '-NH3-H2O'),
-                            (37.94694, 'Ca/H2'),
-                            (43.96389, 'Na2/H2'),
-                            (46.00548, 'CO2H2'),
-                            (-46.00548, '-CO2H2'),
-                            (67.987424, 'NaCOOH'),
-                            (83.961361, 'KCOOH'),
-                            (97.96737927, 'H2SO4'),
-                            (97.97689507, 'H3PO4'),
-]
 
 ADDUCT_TO_FORMULA_DELTAS = {}
 for search_pattern in [*adduct_search_patterns, *adduct_search_patterns_neg, *extended_adducts]:
